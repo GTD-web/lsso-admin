@@ -23,9 +23,7 @@ export default function LoginPage() {
   }, [isAuthenticated, router]);
 
   // 로그인 폼 제출 처리
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleLogin = async () => {
     // 폼 유효성 검사
     if (!email.trim() || !password.trim()) {
       setError("이메일과 비밀번호를 입력해주세요.");
@@ -43,6 +41,9 @@ export default function LoginPage() {
       if (!response.success) {
         // 오류 메시지 표시
         setError(response.error?.message || "로그인에 실패했습니다.");
+      } else {
+        console.log("로그인 성공");
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("로그인 오류:", error);
@@ -87,13 +88,19 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <div className="space-y-6">
           <TextField
             label="관리자 이메일"
             type="email"
             placeholder="admin@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleLogin();
+              }
+            }}
             fullWidth
             required
           />
@@ -104,18 +111,24 @@ export default function LoginPage() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleLogin();
+              }
+            }}
             fullWidth
             required
           />
 
           <Button
-            type="submit"
+            onClick={handleLogin}
             className="w-full py-2.5"
             loading={loading || isLoading}
           >
             로그인
           </Button>
-        </form>
+        </div>
 
         <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
           <p className="text-sm text-center text-slate-500">
