@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button, Card, TextField, Alert } from "../components/LumirMock";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "../providers/AuthProvider";
 
 // 로그인 페이지 컴포넌트
 export default function LoginPage() {
@@ -43,9 +43,6 @@ export default function LoginPage() {
       if (!response.success) {
         // 오류 메시지 표시
         setError(response.error?.message || "로그인에 실패했습니다.");
-      } else {
-        console.log("로그인 성공");
-        // 성공시 useAuth의 isAuthenticated가 자동으로 업데이트 되어 리다이렉트됨
       }
     } catch (error) {
       console.error("로그인 오류:", error);

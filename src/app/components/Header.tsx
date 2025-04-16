@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "./LumirMock";
 import { RiMenuLine } from "react-icons/ri";
 import { User } from "../api/auth";
@@ -38,10 +38,6 @@ export function Header({
       onSidebarCollapsedChange(!isSidebarCollapsed);
     }
   };
-
-  useEffect(() => {
-    console.log("header user", user);
-  }, [user]);
 
   return (
     <header className="bg-white border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-50 w-full shadow-sm">

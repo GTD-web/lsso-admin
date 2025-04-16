@@ -6,7 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Header } from "./components/Header";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { useAuth } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./providers/AuthProvider";
 // Import the index.css directly from the node_modules path
 import "@lumir-company/prototype-ui-sdk/dist/index.css";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -14,15 +14,11 @@ import LoginPage from "./login/page";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// 실제 레이아웃 컴포넌트 (AuthProvider 내부에서 useAuth 사용)
+function LayoutContent({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pathname = usePathname();
-  // 로그인 페이지일 때는 useAuth 결과 중 user, logout만 사용
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   // 로그인 페이지에서는 사이드바와 헤더를 표시하지 않음
   const isLoginPage = pathname === "/";
@@ -116,5 +112,18 @@ export default function RootLayout({
         )}
       </body>
     </html>
+  );
+}
+
+// 루트 레이아웃 - AuthProvider 추가
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <LayoutContent>{children}</LayoutContent>
+    </AuthProvider>
   );
 }

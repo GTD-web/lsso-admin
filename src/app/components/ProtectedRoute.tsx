@@ -18,10 +18,6 @@ export default function ProtectedRoute({
   isLoading,
   user,
 }: ProtectedRouteProps) {
-  console.log(
-    "protectedRouteprotectedRouteprotectedRouteprotectedRouteprotectedRoute",
-    isAuthenticated
-  );
   const router = useRouter();
 
   useEffect(() => {
