@@ -7,7 +7,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import {
   Token,
-  TokenCreateRequest,
+  CreateTokenRequest,
   getTokensByUser,
   createToken,
 } from "../../api/tokens";
@@ -136,7 +136,7 @@ export default function UserDetailPage() {
     setTokenLoading(true);
 
     try {
-      const tokenRequest: TokenCreateRequest = {
+      const tokenRequest: CreateTokenRequest = {
         userId,
         systemId: newTokenData.systemId,
         expiresInDays: newTokenData.expiresInDays,

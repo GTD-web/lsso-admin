@@ -10,7 +10,7 @@ import { useAuth } from "./hooks/useAuth";
 // Import the index.css directly from the node_modules path
 import "@lumir-company/prototype-ui-sdk/dist/index.css";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminLogin from "./login/page";
+import LoginPage from "./login/page";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,7 +22,8 @@ export default function RootLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading, error, login, logout } = useAuth();
+  // 로그인 페이지일 때는 useAuth 결과 중 user, logout만 사용
+  const { user, logout, isAuthenticated, isLoading } = useAuth();
   // 로그인 페이지에서는 사이드바와 헤더를 표시하지 않음
   const isLoginPage = pathname === "/";
 
@@ -70,12 +71,7 @@ export default function RootLayout({
       <body className={inter.className}>
         {isLoginPage ? (
           <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <AdminLogin
-              login={login}
-              isAuthenticated={isAuthenticated}
-              isLoading={isLoading}
-              error={error || ""}
-            ></AdminLogin>
+            <LoginPage />
           </div>
         ) : (
           <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">

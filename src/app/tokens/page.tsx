@@ -10,7 +10,7 @@ import {
   Select,
 } from "../components/LumirMock";
 import { useTokens } from "../hooks/useTokens";
-import { Token, TokenCreateRequest } from "../api/tokens";
+import { Token, CreateTokenRequest } from "../api/tokens";
 import { System, getAllSystems } from "../api/systems";
 import { getAllUsers } from "../api/users";
 
@@ -150,7 +150,7 @@ export default function TokensPage() {
         }
       } else {
         // 토큰 생성
-        const tokenData: TokenCreateRequest = {
+        const tokenData: CreateTokenRequest = {
           userId: formData.userId,
           systemId: formData.systemId,
           expiresInDays: formData.expiresInDays,

@@ -3,32 +3,20 @@
 import { useState, useEffect } from "react";
 import { Button, Card, TextField, Alert } from "../components/LumirMock";
 import { useRouter } from "next/navigation";
-import { ApiResponse } from "../api/types";
-import { AdminAuthData } from "../api/auth";
+import { useAuth } from "../hooks/useAuth";
 
-export default function AdminLogin({
-  login,
-  isAuthenticated,
-  isLoading: authLoading,
-  error: authError,
-}: {
-  login: (
-    email: string,
-    password: string
-  ) => Promise<ApiResponse<AdminAuthData>>;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string;
-}) {
+// 로그인 페이지 컴포넌트
+export default function LoginPage() {
   const router = useRouter();
+  const { login, isAuthenticated, isLoading } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 사용자가 이미 인증된 경우 대시보드로 리다이렉트
+  // 인증 상태 확인
   useEffect(() => {
-    console.log("로그인 페이지 - 인증 상태 확인:", isAuthenticated);
     if (isAuthenticated) {
       router.push("/dashboard");
     }
@@ -48,7 +36,7 @@ export default function AdminLogin({
     setError("");
 
     try {
-      // useAuth 훅의 로그인 함수 사용
+      // 로그인 함수 사용
       const response = await login(email, password);
       console.log("로그인 응답:", response);
 
@@ -57,8 +45,8 @@ export default function AdminLogin({
         setError(response.error?.message || "로그인에 실패했습니다.");
       } else {
         console.log("로그인 성공");
+        // 성공시 useAuth의 isAuthenticated가 자동으로 업데이트 되어 리다이렉트됨
       }
-      // 로그인 성공 시 위의 useEffect가 대시보드로 리다이렉트
     } catch (error) {
       console.error("로그인 오류:", error);
       setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
@@ -68,7 +56,7 @@ export default function AdminLogin({
   };
 
   // 초기 인증 확인 중 로딩 상태 표시
-  if (authLoading && !isAuthenticated) {
+  if (isLoading && !isAuthenticated) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -96,9 +84,9 @@ export default function AdminLogin({
       </div>
 
       <Card className="p-8 w-full max-w-md shadow-lg">
-        {(error || authError) && (
+        {error && (
           <Alert variant="error" className="mb-6">
-            {error || authError}
+            {error}
           </Alert>
         )}
 
@@ -126,7 +114,7 @@ export default function AdminLogin({
           <Button
             type="submit"
             className="w-full py-2.5"
-            loading={loading || authLoading}
+            loading={loading || isLoading}
           >
             로그인
           </Button>

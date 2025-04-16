@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import {
-  TokenCreateRequest,
   getAllTokens,
   getTokensBySystem,
   getTokensByUser,
@@ -9,6 +8,7 @@ import {
   updateTokenStatus,
   renewToken,
   deleteToken,
+  CreateTokenRequest,
 } from "../api/tokens";
 
 // 토큰 관리를 위한 커스텀 훅
@@ -111,7 +111,7 @@ export function useTokens() {
   }, []);
 
   // 토큰 생성
-  const addToken = useCallback(async (tokenData: TokenCreateRequest) => {
+  const addToken = useCallback(async (tokenData: CreateTokenRequest) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -137,7 +137,9 @@ export function useTokens() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await updateTokenStatus(id, isActive);
+        const response = await updateTokenStatus(id, {
+          isActive: isActive,
+        });
         if (response.success && response.data) {
           return response.data;
         } else {
@@ -161,7 +163,9 @@ export function useTokens() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await renewToken(id, expiresInDays);
+        const response = await renewToken(id, {
+          expiresInDays: expiresInDays,
+        });
         if (response.success && response.data) {
           return response.data;
         } else {

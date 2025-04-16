@@ -117,7 +117,9 @@ export default function SystemDetailPage() {
     setSuccessMessage(null);
 
     try {
-      const response = await updateTokenStatus(tokenId, !currentStatus);
+      const response = await updateTokenStatus(tokenId, {
+        isActive: !currentStatus,
+      });
 
       if (response.success && response.data) {
         setSystemTokens((prevTokens) =>
@@ -158,7 +160,7 @@ export default function SystemDetailPage() {
     setSuccessMessage(null);
 
     try {
-      const response = await renewToken(selectedToken.id, expiresInDays);
+      const response = await renewToken(selectedToken.id, { expiresInDays });
 
       if (response.success && response.data) {
         setSystemTokens((prevTokens) =>
