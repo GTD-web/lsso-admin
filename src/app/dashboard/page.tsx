@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button, Card, Alert } from "../components/LumirMock";
 import { getAllUsers } from "../api/users";
 import { getAllSystems } from "../api/systems";
-import { getAllLogs, Log } from "../api/logs";
+import { getLogs, Log } from "../api/logs";
 
 // 시스템 상태 인터페이스
 interface SystemStatus {
@@ -76,31 +76,35 @@ export default function Dashboard() {
         });
 
         // 로그 데이터 로드
-        const logsResponse = await getAllLogs();
+        const logsResponse = await getLogs(1, 50); // 더 많은 로그를 조회하여 분석
         const logs =
-          logsResponse.success && logsResponse.data ? logsResponse.data : [];
+          logsResponse.success && logsResponse.data?.logs
+            ? logsResponse.data.logs
+            : [];
 
         // 로그 분석
         const recentLogs = logs.slice(0, 5);
         const loginLogs = logs.filter(
-          (log) => log.url.includes("/login") || log.url.includes("/auth")
+          (log: Log) => log.url.includes("/login") || log.url.includes("/auth")
         );
         const loginSuccess = loginLogs.filter(
-          (log) => !log.isError && (log.statusCode || 0) < 400
+          (log: Log) => !log.error && (log.statusCode || 0) < 400
         ).length;
         const loginFailed = loginLogs.filter(
-          (log) => log.isError || (log.statusCode || 0) >= 400
+          (log: Log) => log.error || (log.statusCode || 0) >= 400
         ).length;
 
         // 평균 응답 시간 계산
         const responseTimes = logs
-          .filter((log) => log.responseTime)
-          .map((log) => log.responseTime || 0);
+          .filter((log: Log) => log.responseTime)
+          .map((log: Log) => log.responseTime || 0);
         const avgResponseTime =
           responseTimes.length > 0
             ? Math.round(
-                responseTimes.reduce((sum, time) => sum + time, 0) /
-                  responseTimes.length
+                responseTimes.reduce(
+                  (sum: number, time: number) => sum + time,
+                  0
+                ) / responseTimes.length
               )
             : 0;
 
@@ -138,7 +142,7 @@ export default function Dashboard() {
       }
     };
 
-    // loadDashboardData();
+    loadDashboardData();
   }, []);
 
   // 날짜 포맷팅
@@ -337,7 +341,7 @@ export default function Dashboard() {
                           <div className="flex items-center">
                             <span
                               className={`inline-flex px-2 py-1 text-xs rounded-full mr-2 ${
-                                log.isError
+                                log.error
                                   ? "bg-red-100 text-red-800"
                                   : "bg-green-100 text-green-800"
                               }`}
@@ -347,7 +351,7 @@ export default function Dashboard() {
                             <p className="font-medium">{log.url}</p>
                           </div>
                           <p className="text-sm text-slate-500 mt-1">
-                            {formatDate(log.requestTimestamp)} •{" "}
+                            {formatDate(log.timestamp)} •{" "}
                             {log.statusCode || "N/A"}
                           </p>
                         </div>

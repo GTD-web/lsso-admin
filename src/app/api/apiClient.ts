@@ -23,7 +23,7 @@ export class ApiError extends Error {
 export interface ApiRequestOptions {
   method?: string;
   headers?: Record<string, string>;
-  body?: any;
+  body?: Record<string, unknown> | unknown[] | null;
   token?: string;
   skipNestedData?: boolean;
 }
@@ -111,7 +111,7 @@ export async function apiGet<T>(
  */
 export async function apiPost<T>(
   endpoint: string,
-  body: any,
+  body: Record<string, unknown> | unknown[] | null,
   options: Omit<ApiRequestOptions, "method"> = {}
 ): Promise<ApiResponse<T>> {
   return apiRequest<T>(endpoint, { ...options, method: "POST", body });
@@ -122,7 +122,7 @@ export async function apiPost<T>(
  */
 export async function apiPut<T>(
   endpoint: string,
-  body: any,
+  body: Record<string, unknown> | unknown[] | null,
   options: Omit<ApiRequestOptions, "method"> = {}
 ): Promise<ApiResponse<T>> {
   return apiRequest<T>(endpoint, { ...options, method: "PUT", body });
@@ -143,7 +143,7 @@ export async function apiDelete<T>(
  */
 export async function apiPatch<T>(
   endpoint: string,
-  body: any,
+  body: Record<string, unknown> | unknown[] | null,
   options: Omit<ApiRequestOptions, "method"> = {}
 ): Promise<ApiResponse<T>> {
   return apiRequest<T>(endpoint, { ...options, method: "PATCH", body });

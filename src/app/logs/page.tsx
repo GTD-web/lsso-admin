@@ -168,7 +168,7 @@ export default function LogsPage() {
     }
 
     return (
-      <pre className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-60 text-sm">
+      <pre className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-60 text-sm whitespace-pre-wrap break-all">
         {JSON.stringify(data, null, 2)}
       </pre>
     );
@@ -586,9 +586,10 @@ export default function LogsPage() {
                 gridTemplateColumns: "1fr 1fr",
                 gap: "1.5rem",
               }}
+              className="overflow-hidden"
             >
               {/* 왼쪽 컬럼 */}
-              <div>
+              <div className="overflow-hidden">
                 {/* 기본 정보 */}
                 <div className="bg-gray-50 p-4 rounded-md mb-6">
                   <h3 className="text-sm font-medium text-gray-700 mb-3 border-b pb-1">
@@ -652,11 +653,11 @@ export default function LogsPage() {
                         {selectedLog.url}
                       </span>
                     </div>
-                    <div className="text-sm mb-2">
+                    <div className="text-sm mb-2 break-words">
                       <span className="font-medium">Host:</span>{" "}
                       {selectedLog.host}
                     </div>
-                    <div className="text-sm mb-2">
+                    <div className="text-sm mb-2 break-words">
                       <span className="font-medium">IP:</span> {selectedLog.ip}
                     </div>
                     <div className="text-sm">
@@ -670,7 +671,7 @@ export default function LogsPage() {
               </div>
 
               {/* 오른쪽 컬럼 */}
-              <div>
+              <div className="overflow-hidden">
                 {/* 쿼리 */}
                 <div className="bg-gray-50 p-4 rounded-md mb-6">
                   <h3 className="text-sm font-medium text-gray-700 mb-2 border-b pb-1">

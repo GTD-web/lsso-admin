@@ -28,6 +28,11 @@ export default function UsersPage() {
   const [sortField, setSortField] = useState<keyof User>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+
   // 유저 목록 조회
   useEffect(() => {
     const fetchUsers = async () => {
@@ -40,6 +45,8 @@ export default function UsersPage() {
         if (response.success && response.data) {
           setUsers(response.data);
           setFilteredUsers(response.data);
+          // 총 페이지 수 계산
+          setTotalPages(Math.ceil(response.data.length / itemsPerPage));
         } else {
           setError(
             response.error?.message || "사용자 목록을 불러오는데 실패했습니다."
@@ -54,12 +61,14 @@ export default function UsersPage() {
     };
 
     fetchUsers();
-  }, []);
+  }, [itemsPerPage]);
 
   // 검색 처리
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       setFilteredUsers(users);
+      setTotalPages(Math.ceil(users.length / itemsPerPage));
+      setCurrentPage(1); // 검색 시 첫 페이지로 이동
       return;
     }
 
@@ -68,6 +77,8 @@ export default function UsersPage() {
       const response = await searchUsers(searchQuery);
       if (response.success && response.data) {
         setFilteredUsers(response.data);
+        setTotalPages(Math.ceil(response.data.length / itemsPerPage));
+        setCurrentPage(1); // 검색 시 첫 페이지로 이동
       } else {
         setError(response.error?.message || "검색에 실패했습니다.");
       }
@@ -122,6 +133,23 @@ export default function UsersPage() {
     return 0;
   });
 
+  // 현재 페이지의 사용자만 보여주기
+  const currentUsers = sortedUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // 페이지 변경 처리
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // 한 페이지당 표시할 항목 수 변경 처리
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setCurrentPage(1); // 항목 수 변경 시 첫 페이지로 이동
+  };
+
   // 테이블 헤더 셀 컴포넌트
   const TableHeaderCell = ({
     field,
@@ -142,6 +170,92 @@ export default function UsersPage() {
       </div>
     </th>
   );
+
+  // 페이지네이션 컨트롤 렌더링
+  const renderPagination = () => {
+    const pages = [];
+    const maxPageButtons = 5; // 표시할 최대 페이지 버튼 수
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+    const endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+    // 시작 페이지 조정
+    if (endPage - startPage + 1 < maxPageButtons) {
+      startPage = Math.max(1, endPage - maxPageButtons + 1);
+    }
+
+    // 처음 및 이전 버튼
+    pages.push(
+      <Button
+        key="first"
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(1)}
+        disabled={currentPage === 1}
+        className="mx-1"
+      >
+        &laquo;
+      </Button>
+    );
+
+    pages.push(
+      <Button
+        key="prev"
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="mx-1"
+      >
+        &lt;
+      </Button>
+    );
+
+    // 페이지 번호 버튼들
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <Button
+          key={i}
+          variant={i === currentPage ? "primary" : "outline"}
+          size="sm"
+          onClick={() => handlePageChange(i)}
+          className="mx-1"
+        >
+          {i}
+        </Button>
+      );
+    }
+
+    // 다음 및 마지막 버튼
+    pages.push(
+      <Button
+        key="next"
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="mx-1"
+      >
+        &gt;
+      </Button>
+    );
+
+    pages.push(
+      <Button
+        key="last"
+        variant="outline"
+        size="sm"
+        onClick={() => handlePageChange(totalPages)}
+        disabled={currentPage === totalPages}
+        className="mx-1"
+      >
+        &raquo;
+      </Button>
+    );
+
+    return pages;
+  };
+
   console.log("user", users);
   return (
     <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
@@ -150,7 +264,16 @@ export default function UsersPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           {/* 필터 영역 - 왼쪽 */}
           <div className="flex items-center gap-4">
-            {/* 필터 드롭다운 등이 필요한 경우 여기에 추가 */}
+            <select
+              className="rounded-md border border-gray-300 text-sm px-3 py-2 bg-white"
+              value={itemsPerPage}
+              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+            >
+              <option value={5}>5개씩 보기</option>
+              <option value={10}>10개씩 보기</option>
+              <option value={20}>20개씩 보기</option>
+              <option value={50}>50개씩 보기</option>
+            </select>
           </div>
 
           {/* 검색 영역 - 오른쪽 */}
@@ -203,7 +326,7 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedUsers.map((user) => (
+                  {currentUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                         {user.employeeNumber}
@@ -252,20 +375,25 @@ export default function UsersPage() {
           </div>
         </Card>
 
-        {/* 페이지네이션 영역 (실제 구현에서는 서버 데이터에 맞게 조정 필요) */}
-        <div className="flex justify-center mt-6">
-          <div className="flex space-x-1">
-            {[1].map((page) => (
-              <Button
-                key={page}
-                variant={page === 1 ? "primary" : "outline"}
-                size="sm"
-              >
-                {page}
-              </Button>
-            ))}
+        {/* 페이지네이션 영역 */}
+        {!loading && sortedUsers.length > 0 && (
+          <div className="flex justify-between items-center mt-6">
+            <div className="text-sm text-gray-700">
+              총 <span className="font-medium">{sortedUsers.length}</span>명의
+              사용자 중{" "}
+              <span className="font-medium">
+                {(currentPage - 1) * itemsPerPage + 1}
+              </span>
+              -
+              <span className="font-medium">
+                {Math.min(currentPage * itemsPerPage, sortedUsers.length)}
+              </span>
+              명 표시
+            </div>
+
+            <div className="flex space-x-1">{renderPagination()}</div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
