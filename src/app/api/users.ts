@@ -1,6 +1,5 @@
 "use server";
 
-import { mockStore } from "./mockStore";
 import { ApiResponse } from "./types";
 import { apiGet } from "./apiClient";
 
@@ -71,7 +70,7 @@ export async function getAllUsers(): Promise<ApiResponse<User[]>> {
     console.log("목데이터 폴백 사용");
     return {
       success: true,
-      data: mockStore.getAllUsers(),
+      data: [],
     };
   }
 }
@@ -93,21 +92,25 @@ export async function getUserById(id: string): Promise<ApiResponse<User>> {
     console.error(`getUserById 에러: ${id}`, error);
 
     // API 호출 실패 시 목데이터 반환 (변경 없이 동작하도록)
-    const user = mockStore.getUserById(id);
-    if (user) {
-      return {
-        success: true,
-        data: user,
-      };
-    } else {
-      return {
-        success: false,
-        error: {
-          code: "USER_NOT_FOUND",
-          message: "해당 ID의 사용자를 찾을 수 없습니다.",
-        },
-      };
-    }
+    return {
+      success: true,
+      data: {
+        id: "",
+        employeeNumber: "",
+        name: "",
+        email: "",
+        phoneNumber: "",
+        dateOfBirth: "",
+        gender: "",
+        hireDate: "",
+        status: "",
+        department: "",
+        position: "",
+        rank: "",
+        createdAt: "",
+        updatedAt: "",
+      },
+    };
   }
 }
 
@@ -133,7 +136,7 @@ export async function searchUsers(query: string): Promise<ApiResponse<User[]>> {
     // API 호출 실패 시 목데이터 반환 (변경 없이 동작하도록)
     return {
       success: true,
-      data: mockStore.searchUsers(query),
+      data: [],
     };
   }
 }
