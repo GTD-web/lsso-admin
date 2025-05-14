@@ -1,14 +1,15 @@
 import { useState, useCallback } from "react";
 import {
   getAllTokens,
-  getTokensBySystem,
   getTokensByUser,
   getTokenById,
   createToken,
   updateTokenStatus,
   renewToken,
+  refreshTokens,
   deleteToken,
   CreateTokenRequest,
+  RenewTokenRequest,
 } from "../api/tokens";
 
 // 토큰 관리를 위한 커스텀 훅
@@ -33,30 +34,6 @@ export function useTokens() {
     } catch (err) {
       console.error("Error fetching tokens:", err);
       setError("토큰 목록을 불러오는데 실패했습니다.");
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // 시스템별 토큰 조회
-  const fetchTokensBySystem = useCallback(async (systemId: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await getTokensBySystem(systemId);
-      if (response.success && response.data) {
-        return response.data;
-      } else {
-        setError(
-          response.error?.message ||
-            "시스템의 토큰 목록을 불러오는데 실패했습니다."
-        );
-        return [];
-      }
-    } catch (err) {
-      console.error("Error fetching tokens by system:", err);
-      setError("시스템의 토큰 목록을 불러오는데 실패했습니다.");
       return [];
     } finally {
       setIsLoading(false);
@@ -159,13 +136,11 @@ export function useTokens() {
 
   // 토큰 갱신
   const refreshToken = useCallback(
-    async (id: string, expiresInDays?: number) => {
+    async (id: string, renewData: RenewTokenRequest) => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await renewToken(id, {
-          expiresInDays: expiresInDays,
-        });
+        const response = await renewToken(id, renewData);
         if (response.success && response.data) {
           return response.data;
         } else {
@@ -182,6 +157,27 @@ export function useTokens() {
     },
     []
   );
+
+  // 리프레시 토큰으로 액세스 토큰 갱신
+  const refreshAccessToken = useCallback(async (id: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await refreshTokens(id);
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        setError(response.error?.message || "액세스 토큰 갱신에 실패했습니다.");
+        return null;
+      }
+    } catch (err) {
+      console.error("Error refreshing access token:", err);
+      setError("액세스 토큰 갱신에 실패했습니다.");
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // 토큰 삭제
   const removeToken = useCallback(async (id: string) => {
@@ -205,36 +201,38 @@ export function useTokens() {
   }, []);
 
   // 토큰 만료 여부 확인
-  const isTokenExpired = useCallback((expiresAt: string): boolean => {
-    return new Date(expiresAt) < new Date();
-  }, []);
-
-  // 날짜 포맷팅
-  const formatDate = useCallback(
-    (dateString: string | null | undefined): string => {
-      if (!dateString) return "-";
-      return new Date(dateString).toLocaleString("ko-KR", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+  const isTokenExpired = useCallback(
+    (expiryDate: string | null | undefined) => {
+      if (!expiryDate) return true;
+      const expiry = new Date(expiryDate);
+      return expiry <= new Date();
     },
     []
   );
 
+  // 날짜 포맷팅
+  const formatDate = useCallback((dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, []);
+
   return {
     isLoading,
     error,
-    setError,
     fetchAllTokens,
-    fetchTokensBySystem,
     fetchTokensByUser,
     fetchTokenById,
     addToken,
     toggleTokenStatus,
     refreshToken,
+    refreshAccessToken,
     removeToken,
     isTokenExpired,
     formatDate,

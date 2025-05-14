@@ -10,18 +10,19 @@ import {
   Select,
 } from "../components/LumirMock";
 import { useTokens } from "../hooks/useTokens";
-import { Token, CreateTokenRequest } from "../api/tokens";
-import { System, getAllSystems } from "../api/systems";
+import { Token, CreateTokenRequest, RenewTokenRequest } from "../api/tokens";
 import { getAllUsers } from "../api/users";
+import AdminLayout from "../components/AdminLayout";
 
 export default function TokensPage() {
   const {
     isLoading,
-    error,
+    error: hookError,
     fetchAllTokens,
     addToken,
     toggleTokenStatus,
     refreshToken,
+    refreshAccessToken,
     removeToken,
     isTokenExpired,
     formatDate,
@@ -32,22 +33,19 @@ export default function TokensPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
-  const [selectedSystemId, setSelectedSystemId] = useState<string>("all");
-  const [systemsList, setSystemsList] = useState<System[]>([]);
-  const [formData, setFormData] = useState<{
-    userId: string;
-    systemId: string;
-    expiresInDays: number;
-  }>({
-    userId: "",
-    systemId: "",
-    expiresInDays: 30,
-  });
-
-  // 사용자 목록 (API 호출로 가져옴)
   const [usersList, setUsersList] = useState<
     { value: string; label: string }[]
   >([]);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<{
+    userId: string;
+    expiresInDays: number;
+    refreshExpiresInDays: number;
+  }>({
+    userId: "",
+    expiresInDays: 1,
+    refreshExpiresInDays: 30,
+  });
 
   // 사용자 목록 불러오기
   useEffect(() => {
@@ -55,12 +53,19 @@ export default function TokensPage() {
       try {
         const response = await getAllUsers();
         if (response.success && response.data) {
-          setUsersList(
-            response.data.map((user) => ({
-              value: user.id,
-              label: `${user.name} (${user.email})`,
-            }))
-          );
+          const userOptions = response.data.map((user) => ({
+            value: user.id,
+            label: `${user.name} (${user.email})`,
+          }));
+          setUsersList(userOptions);
+
+          // 사용자 목록이 있으면 첫 번째 사용자를 기본값으로 설정
+          if (userOptions.length > 0 && !formData.userId) {
+            setFormData((prev) => ({
+              ...prev,
+              userId: userOptions[0].value,
+            }));
+          }
         }
       } catch (error) {
         console.error("사용자 목록을 불러오는데 실패했습니다:", error);
@@ -68,22 +73,6 @@ export default function TokensPage() {
     };
 
     loadUsers();
-  }, []);
-
-  // 시스템 목록 불러오기
-  useEffect(() => {
-    const loadSystems = async () => {
-      try {
-        const response = await getAllSystems();
-        if (response.success && response.data) {
-          setSystemsList(response.data);
-        }
-      } catch (error) {
-        console.error("시스템 목록을 불러오는데 실패했습니다:", error);
-      }
-    };
-
-    loadSystems();
   }, []);
 
   // 토큰 목록 불러오기
@@ -99,11 +88,16 @@ export default function TokensPage() {
   // 토큰 생성 모달 열기
   const handleCreateToken = () => {
     setSelectedToken(null);
+
+    // 기본 사용자 ID 설정 (사용자 목록의 첫 번째 항목)
+    const defaultUserId = usersList.length > 0 ? usersList[0].value : "";
+
     setFormData({
-      userId: "",
-      systemId: "",
-      expiresInDays: 30,
+      userId: defaultUserId,
+      expiresInDays: 1,
+      refreshExpiresInDays: 30,
     });
+
     setIsModalOpen(true);
   };
 
@@ -112,8 +106,8 @@ export default function TokensPage() {
     setSelectedToken(token);
     setFormData({
       userId: token.userId,
-      systemId: token.systemId,
-      expiresInDays: 30,
+      expiresInDays: 1,
+      refreshExpiresInDays: 30,
     });
     setIsModalOpen(true);
   };
@@ -124,7 +118,7 @@ export default function TokensPage() {
   ) => {
     const { name, value } = e.target;
 
-    if (name === "expiresInDays") {
+    if (name === "expiresInDays" || name === "refreshExpiresInDays") {
       setFormData((prev) => ({ ...prev, [name]: parseInt(value) }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -135,25 +129,34 @@ export default function TokensPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 유효성 검사
+    if (!selectedToken && !formData.userId) {
+      setFormError("사용자를 선택해주세요.");
+      return;
+    }
+
     try {
       if (selectedToken) {
         // 토큰 갱신
-        const updatedToken = await refreshToken(
-          selectedToken.id,
-          formData.expiresInDays
-        );
+        const renewData: RenewTokenRequest = {
+          expiresInDays: formData.expiresInDays,
+          refreshExpiresInDays: formData.refreshExpiresInDays,
+        };
+
+        const updatedToken = await refreshToken(selectedToken.id, renewData);
 
         if (updatedToken) {
           // 전체 토큰 목록 다시 로드
           await loadTokens();
           setIsModalOpen(false);
+          setFormError(null);
         }
       } else {
         // 토큰 생성
         const tokenData: CreateTokenRequest = {
           userId: formData.userId,
-          systemId: formData.systemId,
           expiresInDays: formData.expiresInDays,
+          refreshExpiresInDays: formData.refreshExpiresInDays,
         };
 
         const newToken = await addToken(tokenData);
@@ -162,10 +165,22 @@ export default function TokensPage() {
           // 전체 토큰 목록 다시 로드
           await loadTokens();
           setIsModalOpen(false);
+          setFormError(null);
         }
       }
     } catch (err) {
       console.error("Token operation failed:", err);
+      setFormError("토큰 작업 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 액세스 토큰만 갱신 처리
+  const handleRefreshAccessToken = async (tokenId: string) => {
+    const updatedToken = await refreshAccessToken(tokenId);
+
+    if (updatedToken) {
+      // 전체 토큰 목록 다시 로드
+      await loadTokens();
     }
   };
 
@@ -208,14 +223,13 @@ export default function TokensPage() {
       (token) =>
         token.userName?.toLowerCase().includes(lowerQuery) ||
         token.userEmail?.toLowerCase().includes(lowerQuery) ||
-        token.systemName?.toLowerCase().includes(lowerQuery) ||
         token.id.toLowerCase().includes(lowerQuery)
     );
 
     setTokens(results);
   };
 
-  // 필터링된 토큰 (상태 및 시스템 기준)
+  // 필터링된 토큰 (상태 기준)
   const filteredTokens = tokens.filter((token) => {
     // 상태별 필터링
     if (selectedStatus === "all") {
@@ -231,22 +245,8 @@ export default function TokensPage() {
       return false;
     }
 
-    // 시스템별 필터링
-    if (selectedSystemId !== "all" && token.systemId !== selectedSystemId) {
-      return false;
-    }
-
     return true;
   });
-
-  // 모든 시스템 옵션 생성 (API에서 가져온 전체 시스템 목록 사용)
-  const systemOptions = [
-    { value: "all", label: "모든 시스템" },
-    ...systemsList.map((system) => ({
-      value: system.id,
-      label: system.name,
-    })),
-  ];
 
   // 토큰 테이블 렌더링 함수
   const renderTokenTable = (tokens: Token[]) => (
@@ -255,16 +255,16 @@ export default function TokensPage() {
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-800">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              시스템
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               사용자
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               상태
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              만료일
+              토큰 만료일
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              리프레시 만료일
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               마지막 접근
@@ -282,12 +282,10 @@ export default function TokensPage() {
             <tr key={token.id}>
               <td className="px-4 py-3 text-sm">
                 <div className="font-medium text-gray-900 dark:text-white">
-                  {token.systemName}
-                </div>
-              </td>
-              <td className="px-4 py-3 text-sm">
-                <div className="font-medium text-gray-900 dark:text-white">
                   {token.userName}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {token.userEmail || "이메일 없음"}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   ID: {token.id.substring(0, 8)}...
@@ -315,6 +313,9 @@ export default function TokensPage() {
                 {formatDate(token.tokenExpiresAt)}
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                {formatDate(token.refreshTokenExpiresAt)}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                 {formatDate(token.lastAccess)}
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
@@ -332,6 +333,16 @@ export default function TokensPage() {
                   >
                     {token.isActive ? "비활성화" : "활성화"}
                   </Button>
+                  {token.isActive &&
+                    !isTokenExpired(token.refreshTokenExpiresAt) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRefreshAccessToken(token.id)}
+                      >
+                        액세스 갱신
+                      </Button>
+                    )}
                   {(isTokenExpired(token.tokenExpiresAt) ||
                     !token.isActive) && (
                     <Button
@@ -339,7 +350,7 @@ export default function TokensPage() {
                       variant="outline"
                       onClick={() => handleRenewToken(token)}
                     >
-                      갱신
+                      토큰 갱신
                     </Button>
                   )}
                   <Button
@@ -360,24 +371,13 @@ export default function TokensPage() {
   );
 
   return (
-    <>
+    <AdminLayout title="토큰 관리">
       <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* 검색 및 필터 영역 */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             {/* 필터 영역 - 왼쪽으로 이동 */}
             <div className="flex items-center gap-4">
-              {/* 시스템 필터 */}
-              <div className="flex items-center">
-                <span className="text-sm text-gray-500 mr-2">시스템:</span>
-                <Select
-                  value={selectedSystemId}
-                  onChange={(e) => setSelectedSystemId(e.target.value)}
-                  className="w-40 md:w-48"
-                  options={systemOptions}
-                />
-              </div>
-
               {/* 상태 필터 */}
               <div className="flex items-center">
                 <span className="text-sm text-gray-500 mr-2">상태:</span>
@@ -410,10 +410,15 @@ export default function TokensPage() {
             </div>
           </div>
 
+          {/* 새 토큰 생성 버튼 */}
+          <div className="mb-4">
+            <Button onClick={handleCreateToken}>새 토큰 생성</Button>
+          </div>
+
           {/* 에러 메시지 */}
-          {error && (
+          {hookError && (
             <Alert variant="error" className="mb-6">
-              {error}
+              {hookError}
             </Alert>
           )}
 
@@ -454,6 +459,12 @@ export default function TokensPage() {
         onClose={() => setIsModalOpen(false)}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {formError && (
+            <Alert variant="error" className="mb-4">
+              {formError}
+            </Alert>
+          )}
+
           {!selectedToken ? (
             <>
               <Select
@@ -464,27 +475,10 @@ export default function TokensPage() {
                 required
                 options={usersList}
               />
-
-              <Select
-                label="시스템"
-                name="systemId"
-                value={formData.systemId}
-                onChange={handleInputChange}
-                required
-                options={[
-                  { value: "", label: "시스템 선택" },
-                  ...systemsList.map((system) => ({
-                    value: system.id,
-                    label: system.name,
-                  })),
-                ]}
-              />
             </>
           ) : (
             <div className="mb-4">
-              <p className="font-medium">
-                {selectedToken.userName} → {selectedToken.systemName}
-              </p>
+              <p className="font-medium">사용자: {selectedToken.userName}</p>
               <p className="text-gray-500 text-sm">
                 토큰 ID: {selectedToken.id}
               </p>
@@ -492,12 +486,23 @@ export default function TokensPage() {
           )}
 
           <TextField
-            label="유효 기간 (일)"
+            label="액세스 토큰 유효 기간 (일)"
             name="expiresInDays"
             type="number"
             min={1}
             max={365}
             value={formData.expiresInDays.toString()}
+            onChange={handleInputChange}
+            required
+          />
+
+          <TextField
+            label="리프레시 토큰 유효 기간 (일)"
+            name="refreshExpiresInDays"
+            type="number"
+            min={30}
+            max={730}
+            value={formData.refreshExpiresInDays.toString()}
             onChange={handleInputChange}
             required
           />
@@ -516,6 +521,6 @@ export default function TokensPage() {
           </div>
         </form>
       </Modal>
-    </>
+    </AdminLayout>
   );
 }

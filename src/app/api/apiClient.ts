@@ -3,7 +3,7 @@ import { ApiResponse } from "./types";
 // API 기본 URL
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3030") + "/api";
-
+console.log("API_BASE_URL", API_BASE_URL);
 /**
  * API 에러 타입
  */
@@ -70,20 +70,36 @@ export async function apiRequest<T>(
     });
 
     const responseData = await response.json();
-    console.log(`[API Response] ${method} ${url}:`);
+    console.log(`[API Response] ${method} ${url}:`, responseData);
 
-    // NestJS 응답 구조: { data: { success: true, data: {...} } }
-    // 이중 중첩된 data 구조 처리
-    // if (
-    //   !skipNestedData &&
-    //   responseData.data &&
-    //   typeof responseData.data === "object" &&
-    //   ("success" in responseData.data || "data" in responseData.data)
-    // ) {
-    //   return responseData.data as ApiResponse<T>;
-    // }
+    // 백엔드 응답을 프론트엔드의 ApiResponse 형식으로 변환
+    // 백엔드가 ApiResponseDto를 사용하므로 그대로 사용
+    if (responseData && typeof responseData === "object") {
+      // responseData가 이미 ApiResponseDto 형식인 경우 (success, data, error 속성 포함)
+      if ("success" in responseData) {
+        // 이미 올바른 형식을 가지고 있음
+        console.log(
+          "[API Format] 백엔드 응답이 이미 ApiResponseDto 형식입니다."
+        );
+        return responseData as ApiResponse<T>;
+      }
 
-    return responseData as ApiResponse<T>;
+      // 백엔드가 ApiResponseDto를 사용하지 않고 직접 데이터를 반환한 경우
+      console.log(
+        "[API Format] 백엔드 응답을 ApiResponse 형식으로 변환합니다."
+      );
+      return {
+        success: true,
+        data: responseData as T,
+      };
+    }
+
+    // 응답이 예상 형식이 아닌 경우 (배열이거나 null 등)
+    console.log("[API Format] 예상치 못한 응답 형식입니다. 그대로 반환합니다.");
+    return {
+      success: true,
+      data: responseData as T,
+    };
   } catch (error) {
     console.error(`[API Error] ${endpoint}:`, error);
 
@@ -158,7 +174,9 @@ export async function safeApiRequest<T>(
   defaultData: T
 ): Promise<ApiResponse<T>> {
   try {
-    return await apiCall();
+    const response = await apiCall();
+    console.log("[Safe API Response]", response);
+    return response;
   } catch (error) {
     console.error("[Safe API Error]", error);
     return {

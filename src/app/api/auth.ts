@@ -13,14 +13,14 @@ export interface User {
 
 // 인증 토큰 타입
 export interface AuthTokens {
-  token: string;
+  accessToken: string;
   refreshToken: string;
 }
 
 // 관리자 인증 응답 타입
 export interface AdminAuthData {
-  user: User;
-  token: string;
+  admin: User;
+  accessToken: string;
   refreshToken: string;
 }
 
@@ -40,6 +40,13 @@ export interface TokenRefreshRequest {
   refreshToken: string;
 }
 
+// 토큰 응답 타입
+export interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 // 로그아웃 요청 타입
 export interface LogoutRequest {
   refreshToken: string;
@@ -55,19 +62,37 @@ export async function adminLogin(
   email: string,
   password: string
 ): Promise<ApiResponse<AdminAuthData>> {
-  return safeApiRequest<AdminAuthData>(
-    () => apiPost<AdminAuthData>("/admin/auth/login", { email, password }),
-    {
-      user: {
-        id: "",
-        email: "",
-        name: "",
-        role: "",
-      },
-      token: "",
-      refreshToken: "",
+  console.log("Admin login API 호출 시작:", { email });
+
+  try {
+    const result = await safeApiRequest<AdminAuthData>(
+      () => apiPost<AdminAuthData>("/admin/auth/login", { email, password }),
+      {
+        admin: {
+          id: "",
+          email: "",
+          name: "",
+          role: "",
+        },
+        accessToken: "",
+        refreshToken: "",
+      }
+    );
+
+    console.log("Admin login API 응답:", result);
+    console.log("응답 구조:", JSON.stringify(result, null, 2));
+
+    // 응답에 필요한 데이터가 있는지 확인
+    if (result.success && result.data) {
+      return result;
+    } else {
+      console.error("로그인 API 오류 또는 응답 형식 불일치:", result);
+      return result;
     }
-  );
+  } catch (error) {
+    console.error("Admin login API 호출 실패:", error);
+    throw error;
+  }
 }
 
 /**
@@ -81,13 +106,13 @@ export async function verifyToken(
   return safeApiRequest<AdminAuthData>(
     () => apiPost<AdminAuthData>("/admin/auth/verify", { token }),
     {
-      user: {
+      admin: {
         id: "",
         email: "",
         name: "",
         role: "",
       },
-      token: "",
+      accessToken: "",
       refreshToken: "",
     }
   );
@@ -100,19 +125,56 @@ export async function verifyToken(
  */
 export async function refreshAuthToken(
   refreshToken: string
-): Promise<ApiResponse<AdminAuthData>> {
-  return safeApiRequest<AdminAuthData>(
-    () => apiPost<AdminAuthData>("/admin/auth/refresh", { refreshToken }),
+): Promise<ApiResponse<TokenResponse>> {
+  return safeApiRequest<TokenResponse>(
+    () => apiPost<TokenResponse>("/admin/auth/refresh", { refreshToken }),
     {
-      user: {
-        id: "",
-        email: "",
-        name: "",
-        role: "",
-      },
-      token: "",
+      accessToken: "",
       refreshToken: "",
+      expiresIn: 0,
     }
+  );
+}
+
+/**
+ * Get admin profile information
+ * @param token The JWT access token
+ * @returns Admin profile data or error
+ */
+export async function getAdminProfile(
+  token: string
+): Promise<ApiResponse<User>> {
+  return safeApiRequest<User>(
+    () => apiPost<User>("/admin/auth/profile", {}, { token }),
+    {
+      id: "",
+      email: "",
+      name: "",
+      role: "",
+    }
+  );
+}
+
+/**
+ * Change admin password
+ * @param token The JWT access token
+ * @param currentPassword Current password
+ * @param newPassword New password
+ * @returns Success status
+ */
+export async function changeAdminPassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<ApiResponse<{ success: boolean }>> {
+  return safeApiRequest<{ success: boolean }>(
+    () =>
+      apiPost<{ success: boolean }>(
+        "/admin/auth/password",
+        { currentPassword, newPassword },
+        { token }
+      ),
+    { success: false }
   );
 }
 

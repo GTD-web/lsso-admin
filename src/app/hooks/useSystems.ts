@@ -7,6 +7,7 @@ import {
   updateSystem,
   deleteSystem,
   searchSystems,
+  regenerateSystemKeys,
 } from "../api/systems";
 
 export function useSystems() {
@@ -154,10 +155,22 @@ export function useSystems() {
   }, []);
 
   // 클라이언트 ID/시크릿 자동 생성
-  const generateCredentials = useCallback(() => {
-    const clientId = `client-${Math.random().toString(36).substr(2, 9)}`;
-    const clientSecret = `secret-${Math.random().toString(36).substr(2, 16)}`;
-    return { clientId, clientSecret };
+  const regenerateKeys = useCallback(async (id: string) => {
+    try {
+      const response = await regenerateSystemKeys(id);
+      if (!response.success) {
+        throw new Error(
+          response.error?.message || "인증 정보 생성에 실패했습니다."
+        );
+      }
+      return response.data;
+    } catch (err) {
+      console.error("Error generating credentials:", err);
+      setError(
+        err instanceof Error ? err.message : "인증 정보 생성에 실패했습니다."
+      );
+      return null;
+    }
   }, []);
 
   return {
@@ -170,6 +183,6 @@ export function useSystems() {
     addSystem,
     editSystem,
     removeSystem,
-    generateCredentials,
+    regenerateKeys,
   };
 }

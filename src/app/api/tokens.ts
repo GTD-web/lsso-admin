@@ -1,14 +1,14 @@
 import { ApiResponse } from "./types";
 import { apiGet, apiPost, apiPut, apiDelete } from "./apiClient";
 
-// 토큰 타입 정의 (명세서 기반)
+// 토큰 타입 정의 (백엔드 TokenResponseDto 기반)
 export type Token = {
   id: string;
   userId: string;
-  systemId: string;
   accessToken: string;
-  secret: string;
+  refreshToken?: string;
   tokenExpiresAt: string;
+  refreshTokenExpiresAt?: string;
   lastAccess?: string | null;
   isActive: boolean;
   createdAt: string;
@@ -16,14 +16,13 @@ export type Token = {
   // 추가 정보
   userName?: string;
   userEmail?: string;
-  systemName?: string;
 };
 
 // 토큰 생성 요청 타입
 export type CreateTokenRequest = {
   userId: string;
-  systemId: string;
   expiresInDays?: number;
+  refreshExpiresInDays?: number;
 };
 
 // 토큰 상태 변경 요청 타입
@@ -34,6 +33,7 @@ export type UpdateTokenStatusRequest = {
 // 토큰 갱신 요청 타입
 export type RenewTokenRequest = {
   expiresInDays?: number;
+  refreshExpiresInDays?: number;
 };
 
 // 모든 토큰 목록 조회
@@ -45,27 +45,6 @@ export async function getAllTokens(): Promise<ApiResponse<Token[]>> {
     });
   } catch (error) {
     console.error("Error fetching tokens:", error);
-    return {
-      success: false,
-      error: {
-        message: "서버 연결 중 오류가 발생했습니다.",
-        code: "TOKEN_SERVER_ERROR",
-      },
-    };
-  }
-}
-
-// 시스템별 토큰 조회
-export async function getTokensBySystem(
-  systemId: string
-): Promise<ApiResponse<Token[]>> {
-  try {
-    const token = getAuthToken();
-    return await apiGet<Token[]>(`/admin/tokens/system/${systemId}`, {
-      token: token || undefined,
-    });
-  } catch (error) {
-    console.error("Error fetching tokens by system:", error);
     return {
       success: false,
       error: {
@@ -171,6 +150,29 @@ export async function renewToken(
     });
   } catch (error) {
     console.error("Error renewing token:", error);
+    return {
+      success: false,
+      error: {
+        message: "서버 연결 중 오류가 발생했습니다.",
+        code: "TOKEN_SERVER_ERROR",
+      },
+    };
+  }
+}
+
+// 리프레시 토큰을 사용하여 액세스 토큰 갱신
+export async function refreshTokens(id: string): Promise<ApiResponse<Token>> {
+  try {
+    const token = getAuthToken();
+    return await apiPut<Token>(
+      `/admin/tokens/${id}/refresh`,
+      {},
+      {
+        token: token || undefined,
+      }
+    );
+  } catch (error) {
+    console.error("Error refreshing token:", error);
     return {
       success: false,
       error: {

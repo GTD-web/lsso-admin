@@ -8,11 +8,34 @@ export type System = {
   description?: string;
   clientId: string;
   clientSecret: string;
+  domain: string;
   allowedOrigin: string[];
   healthCheckUrl?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CreateSystemRequest = {
+  name: string;
+  description?: string;
+  clientId: string;
+  clientSecret: string;
+  domain: string;
+  allowedOrigin: string[];
+  healthCheckUrl?: string;
+  isActive: boolean;
+};
+
+export type UpdateSystemRequest = {
+  name?: string;
+  description?: string;
+  clientId?: string;
+  clientSecret?: string;
+  domain?: string;
+  allowedOrigin?: string[];
+  healthCheckUrl?: string;
+  isActive?: boolean;
 };
 
 // 모든 시스템 조회
@@ -134,6 +157,31 @@ export async function deleteSystem(id: string): Promise<ApiResponse<boolean>> {
       error: {
         message: "서버 연결 중 오류가 발생했습니다.",
         code: "SYSTEM_SERVER_ERROR",
+      },
+    };
+  }
+}
+
+// 시스템 API 키 재생성
+export async function regenerateSystemKeys(
+  id: string
+): Promise<ApiResponse<System>> {
+  try {
+    const token = getAuthToken();
+    return await apiPost<System>(
+      `/admin/systems/${id}/regenerate-keys`,
+      {},
+      {
+        token: token || undefined,
+      }
+    );
+  } catch (error) {
+    console.error("Error regenerating system keys:", error);
+    return {
+      success: false,
+      error: {
+        message: "인증 정보 재생성 중 오류가 발생했습니다.",
+        code: "SYSTEM_KEYS_REGENERATION_ERROR",
       },
     };
   }

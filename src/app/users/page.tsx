@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, Button, TextField, Alert } from "../components/LumirMock";
 import { getAllUsers, searchUsers, User } from "../api/users";
 import Link from "next/link";
+import AdminLayout from "../components/AdminLayout";
 
 // 날짜를 한국어 형식으로 포맷하는 함수
 function formatDate(dateString?: string): string {
@@ -258,143 +259,147 @@ export default function UsersPage() {
 
   console.log("user", users);
   return (
-    <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
-      <div className="max-w-7xl mx-auto">
-        {/* 검색 및 필터 영역 */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          {/* 필터 영역 - 왼쪽 */}
-          <div className="flex items-center gap-4">
-            <select
-              className="rounded-md border border-gray-300 text-sm px-3 py-2 bg-white"
-              value={itemsPerPage}
-              onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            >
-              <option value={5}>5개씩 보기</option>
-              <option value={10}>10개씩 보기</option>
-              <option value={20}>20개씩 보기</option>
-              <option value={50}>50개씩 보기</option>
-            </select>
-          </div>
-
-          {/* 검색 영역 - 오른쪽 */}
-          <div className="flex">
-            <TextField
-              placeholder="이름, 이메일, 사번, 부서 등 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="min-w-[200px] md:min-w-[260px]"
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            <Button onClick={handleSearch} className="ml-2">
-              검색
-            </Button>
-          </div>
-        </div>
-
-        {/* 에러 메시지 */}
-        {error && (
-          <Alert variant="error" className="mb-6">
-            {error}
-          </Alert>
-        )}
-
-        {/* 유저 테이블 */}
-        <Card className="overflow-hidden">
-          <div className="relative overflow-x-auto">
-            {loading ? (
-              <div className="flex justify-center items-center py-20">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                <p className="ml-3 text-gray-600">데이터를 불러오는 중...</p>
-              </div>
-            ) : sortedUsers.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-gray-500">사용자 정보가 없습니다.</p>
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <TableHeaderCell field="employeeNumber" label="사번" />
-                    <TableHeaderCell field="name" label="이름" />
-                    <TableHeaderCell field="email" label="이메일" />
-                    <TableHeaderCell field="department" label="부서" />
-                    <TableHeaderCell field="position" label="직위" />
-                    <TableHeaderCell field="rank" label="직급" />
-                    <TableHeaderCell field="hireDate" label="입사일" />
-                    <TableHeaderCell field="status" label="상태" />
-                    <th className="px-4 py-3 text-right">관리</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {currentUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.employeeNumber}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {user.name}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.email}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.department || "-"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.position || "-"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.rank || "-"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(user.hireDate)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                            user.status === "재직중"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {user.status || "미설정"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
-                        <Link href={`/users/${user.id}`}>
-                          <Button size="sm" variant="outline">
-                            상세보기
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </Card>
-
-        {/* 페이지네이션 영역 */}
-        {!loading && sortedUsers.length > 0 && (
-          <div className="flex justify-between items-center mt-6">
-            <div className="text-sm text-gray-700">
-              총 <span className="font-medium">{sortedUsers.length}</span>명의
-              사용자 중{" "}
-              <span className="font-medium">
-                {(currentPage - 1) * itemsPerPage + 1}
-              </span>
-              -
-              <span className="font-medium">
-                {Math.min(currentPage * itemsPerPage, sortedUsers.length)}
-              </span>
-              명 표시
+    <AdminLayout title="사용자 관리">
+      <div className="p-4 lg:p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
+        <div className="max-w-7xl mx-auto">
+          {/* 검색 및 필터 영역 */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            {/* 필터 영역 - 왼쪽 */}
+            <div className="flex items-center gap-4">
+              <select
+                className="rounded-md border border-gray-300 text-sm px-3 py-2 bg-white"
+                value={itemsPerPage}
+                onChange={(e) =>
+                  handleItemsPerPageChange(Number(e.target.value))
+                }
+              >
+                <option value={5}>5개씩 보기</option>
+                <option value={10}>10개씩 보기</option>
+                <option value={20}>20개씩 보기</option>
+                <option value={50}>50개씩 보기</option>
+              </select>
             </div>
 
-            <div className="flex space-x-1">{renderPagination()}</div>
+            {/* 검색 영역 - 오른쪽 */}
+            <div className="flex">
+              <TextField
+                placeholder="이름, 이메일, 사번, 부서 등 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="min-w-[200px] md:min-w-[260px]"
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              />
+              <Button onClick={handleSearch} className="ml-2">
+                검색
+              </Button>
+            </div>
           </div>
-        )}
+
+          {/* 에러 메시지 */}
+          {error && (
+            <Alert variant="error" className="mb-6">
+              {error}
+            </Alert>
+          )}
+
+          {/* 유저 테이블 */}
+          <Card className="overflow-hidden">
+            <div className="relative overflow-x-auto">
+              {loading ? (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                  <p className="ml-3 text-gray-600">데이터를 불러오는 중...</p>
+                </div>
+              ) : sortedUsers.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-gray-500">사용자 정보가 없습니다.</p>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <TableHeaderCell field="employeeNumber" label="사번" />
+                      <TableHeaderCell field="name" label="이름" />
+                      <TableHeaderCell field="email" label="이메일" />
+                      <TableHeaderCell field="department" label="부서" />
+                      <TableHeaderCell field="position" label="직위" />
+                      <TableHeaderCell field="rank" label="직급" />
+                      <TableHeaderCell field="hireDate" label="입사일" />
+                      <TableHeaderCell field="status" label="상태" />
+                      <th className="px-4 py-3 text-right">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {currentUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.employeeNumber}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {user.name}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.email}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.department || "-"}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.position || "-"}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.rank || "-"}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(user.hireDate)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                              user.status === "재직중"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {user.status || "미설정"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
+                          <Link href={`/users/${user.id}`}>
+                            <Button size="sm" variant="outline">
+                              상세보기
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </Card>
+
+          {/* 페이지네이션 영역 */}
+          {!loading && sortedUsers.length > 0 && (
+            <div className="flex justify-between items-center mt-6">
+              <div className="text-sm text-gray-700">
+                총 <span className="font-medium">{sortedUsers.length}</span>명의
+                사용자 중{" "}
+                <span className="font-medium">
+                  {(currentPage - 1) * itemsPerPage + 1}
+                </span>
+                -
+                <span className="font-medium">
+                  {Math.min(currentPage * itemsPerPage, sortedUsers.length)}
+                </span>
+                명 표시
+              </div>
+
+              <div className="flex space-x-1">{renderPagination()}</div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

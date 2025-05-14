@@ -5,6 +5,7 @@ import { Card, Button, Alert, Modal } from "../components/LumirMock";
 import { useLogs } from "../hooks/useLogs";
 import { Log, LogFilterParams } from "../api/logs";
 import { SortDirection } from "../hooks/useLogs";
+import AdminLayout from "../components/AdminLayout";
 
 // Debounce hook for inputs
 function useDebounce<T>(value: T, delay: number): T {
@@ -200,7 +201,7 @@ export default function LogsPage() {
   };
 
   return (
-    <>
+    <AdminLayout title="로그 관리">
       <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* 필터 영역 */}
@@ -711,6 +712,6 @@ export default function LogsPage() {
           </>
         )}
       </Modal>
-    </>
+    </AdminLayout>
   );
 }
