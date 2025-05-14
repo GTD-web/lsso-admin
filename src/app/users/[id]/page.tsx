@@ -138,7 +138,6 @@ export default function UserDetailPage() {
     try {
       const tokenRequest: CreateTokenRequest = {
         userId,
-        systemId: newTokenData.systemId,
         expiresInDays: newTokenData.expiresInDays,
       };
 
@@ -363,9 +362,9 @@ export default function UserDetailPage() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {userTokens.map((token) => (
                           <tr key={token.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm">
+                            {/* <td className="px-4 py-3 text-sm">
                               {token.systemName}
-                            </td>
+                            </td> */}
                             <td className="px-4 py-3 text-sm">
                               {getTokenStatusLabel(token)}
                             </td>
