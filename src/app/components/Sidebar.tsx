@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   RiDashboardLine,
   RiUser3Line,
-  RiCodeLine,
+  RiComputerLine,
   RiKey2Line,
   RiFileList3Line,
   // RiSettings5Line,
@@ -18,6 +18,7 @@ interface SidebarItemProps {
   label: string;
   active: boolean;
   collapsed: boolean;
+  // isSidebarItemViewed: boolean;
 }
 
 function SidebarItem({
@@ -26,7 +27,8 @@ function SidebarItem({
   label,
   active,
   collapsed,
-}: SidebarItemProps) {
+}: // isSidebarItemViewed,
+SidebarItemProps) {
   return (
     <Link href={href} className="block">
       <div
@@ -36,14 +38,24 @@ function SidebarItem({
             : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
         }`}
       >
-        <Icon className={`${collapsed ? "w-6 h-6 mx-auto" : "w-5 h-5 mr-3"}`} />
-        <span
-          className={`text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-300 ${
-            collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
-          }`}
+        <Icon className="w-5 h-5 flex-shrink-0" />
+        <div
+          className={`sidebar-text-wrapper overflow-hidden  
+            ${
+              // isSidebarItemViewed
+              //   ? "ml-3 w-0 opacity-0"
+              //   : "ml-3 w-auto opacity-100"
+              "ml-3 w-auto opacity-100"
+            }`}
+          style={{
+            maxWidth: collapsed ? "0" : "200px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            transitionProperty: "max-width, opacity",
+          }}
         >
-          {label}
-        </span>
+          <span className="text-sm font-medium">{label}</span>
+        </div>
       </div>
     </Link>
   );
@@ -55,9 +67,19 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   collapsed: boolean;
+  // isSidebarItemViewed: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onClose,
+  collapsed,
+  // isSidebarItemViewed,
+  onMouseEnter,
+  onMouseLeave,
+}: SidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
@@ -102,7 +124,7 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
   > = {
     dashboard: { path: "/dashboard", label: "대시보드", icon: RiDashboardLine },
     users: { path: "/users", label: "사용자 관리", icon: RiUser3Line },
-    systems: { path: "/systems", label: "시스템 관리", icon: RiCodeLine },
+    systems: { path: "/systems", label: "시스템 관리", icon: RiComputerLine },
     tokens: { path: "/tokens", label: "토큰 관리", icon: RiKey2Line },
     logs: { path: "/logs", label: "로그 관리", icon: RiFileList3Line },
     // settings: { path: "/settings", label: "설정", icon: RiSettings5Line },
@@ -112,7 +134,7 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
   const sidebarClasses = `
     ${isOpen ? "translate-x-0" : "-translate-x-full"}
     lg:static lg:translate-x-0 
-    ${collapsed ? "lg:w-20" : "lg:w-64"} 
+    ${collapsed ? "lg:w-20" : "lg:w-44"} 
     transition-all duration-300 ease-in-out
     bg-white border-r border-gray-200
     dark:bg-gray-800 dark:border-gray-700
@@ -124,6 +146,31 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
 
   return (
     <>
+      <style jsx global>{`
+        .sidebar-text-wrapper {
+          transition: max-width 300ms cubic-bezier(0.25, 1, 0.5, 1),
+            opacity 200ms ease-in-out;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        @keyframes fadeInText {
+          from {
+            opacity: 0;
+            transform: translateX(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        .sidebar-text-wrapper:not(.w-0) span {
+          animation: fadeInText 300ms ease-out forwards;
+          display: inline-block;
+        }
+      `}</style>
+
       {/* Sidebar backdrop overlay (mobile only) */}
       {isOpen && (
         <div
@@ -133,12 +180,13 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
       )}
 
       {/* Sidebar */}
-      <aside className={sidebarClasses}>
+      <aside
+        className={sidebarClasses}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+      >
         <nav className="flex-1 pt-4 pb-4 overflow-y-auto">
           <ul className="space-y-1 px-3">
-            <div
-              className={`flex items-center h-16 px-4 py-3 rounded-lg transition-colors `}
-            ></div>
             {Object.entries(navItems).map(([key, item]) => (
               <li key={key}>
                 <SidebarItem
@@ -147,6 +195,7 @@ export function Sidebar({ isOpen, onClose, collapsed }: SidebarProps) {
                   label={item.label}
                   active={isActiveRoute(item.path)}
                   collapsed={collapsed}
+                  // isSidebarItemViewed={isSidebarItemViewed}
                 />
               </li>
             ))}

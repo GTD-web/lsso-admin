@@ -41,7 +41,7 @@ export function Header({
 
   return (
     <header className="bg-white border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-50 w-full shadow-sm">
-      <div className="h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <div className="h-16 px-3 flex items-center justify-between">
         <div className="flex items-center">
           <button
             onClick={onToggleSidebar}
@@ -66,12 +66,12 @@ export function Header({
 
           <button
             onClick={handleToggleCollapse}
-            className="hidden lg:block p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+            className="hidden lg:block px-1 py-3 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus:outline-none"
             aria-label="사이드바 접기/펼치기"
           >
             <RiMenuLine
-              className={`${
-                isSidebarCollapsed ? "lg:w-10" : "lg:w-52"
+              className={`w-5 h-5  flex-shrink-0 ${
+                isSidebarCollapsed ? "lg:w-10" : "lg:w-36"
               } transition-all duration-300 ease-in-out`}
             />
           </button>

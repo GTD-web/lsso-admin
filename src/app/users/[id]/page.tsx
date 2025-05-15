@@ -12,6 +12,7 @@ import {
   createToken,
 } from "../../api/tokens";
 import { System, getAllSystems } from "../../api/systems";
+import AdminLayout from "../../components/AdminLayout";
 
 // 성별 포맷팅 함수
 function formatGender(gender?: string) {
@@ -118,15 +119,6 @@ export default function UserDetailPage() {
     loadUserTokens();
   }, [userId]);
 
-  // 토큰 생성 모달 열기
-  const handleOpenCreateModal = () => {
-    setNewTokenData({
-      systemId: "",
-      expiresInDays: 30,
-    });
-    setIsCreateModalOpen(true);
-  };
-
   // 토큰 생성 처리
   const handleCreateToken = async () => {
     if (!userId || !newTokenData.systemId) {
@@ -222,8 +214,8 @@ export default function UserDetailPage() {
   );
 
   return (
-    <>
-      <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
+    <AdminLayout title="사용자 상세정보">
+      <div className="p-8 bg-slate-50 dark:bg-slate-900">
         <div className="max-w-5xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -266,76 +258,59 @@ export default function UserDetailPage() {
             </div>
           ) : user ? (
             <div className="space-y-6">
-              {/* 기본 정보 */}
+              {/* 사용자 정보 */}
               <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">기본 정보</h2>
-                <div className="space-y-1">
-                  <InfoField label="이름" value={user.name} />
-                  <InfoField label="사번" value={user.employeeNumber} />
-                  <InfoField label="이메일" value={user.email} />
-                  <InfoField label="전화번호" value={user.phoneNumber || "-"} />
-                  <InfoField label="성별" value={formatGender(user.gender)} />
-                  <InfoField
-                    label="생년월일"
-                    value={formatDate(user.dateOfBirth)}
-                  />
-                </div>
-              </Card>
-
-              {/* 직장 정보 */}
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">직장 정보</h2>
-                <div className="space-y-1">
-                  <InfoField label="부서" value={user.department || "-"} />
-                  <InfoField label="직위" value={user.position || "-"} />
-                  <InfoField label="직급" value={user.rank || "-"} />
-                  <InfoField label="입사일" value={formatDate(user.hireDate)} />
-                  <InfoField
-                    label="재직 상태"
-                    value={
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                          user.status === "재직중"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {user.status || "미설정"}
-                      </span>
-                    }
-                  />
-                </div>
-              </Card>
-
-              {/* 계정 정보 */}
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">계정 정보</h2>
-                <div className="space-y-1">
-                  <InfoField label="사용자 ID" value={user.id} />
-                  <InfoField
-                    label="생성일"
-                    value={formatDate(user.createdAt)}
-                  />
-                  <InfoField
-                    label="마지막 수정일"
-                    value={formatDate(user.updatedAt)}
-                  />
+                <h2 className="text-xl font-semibold mb-4">사용자 정보</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0">
+                  <div className="space-y-1">
+                    <InfoField label="이름" value={user.name} />
+                    <InfoField label="사번" value={user.employeeNumber} />
+                    <InfoField label="이메일" value={user.email} />
+                    <InfoField
+                      label="전화번호"
+                      value={user.phoneNumber || "-"}
+                    />
+                    <InfoField label="성별" value={formatGender(user.gender)} />
+                    <InfoField
+                      label="생년월일"
+                      value={formatDate(user.dateOfBirth)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <InfoField label="부서" value={user.department || "-"} />
+                    <InfoField label="직위" value={user.position || "-"} />
+                    <InfoField label="직급" value={user.rank || "-"} />
+                    <InfoField
+                      label="입사일"
+                      value={formatDate(user.hireDate)}
+                    />
+                    <InfoField
+                      label="재직 상태"
+                      value={
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                            user.status === "재직중"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {user.status || "미설정"}
+                        </span>
+                      }
+                    />
+                  </div>
                 </div>
               </Card>
 
               {/* 토큰 정보 */}
               <Card className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold">토큰 관리</h2>
-                  <Button onClick={handleOpenCreateModal}>새 토큰 발급</Button>
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold">토큰 정보</h2>
                 </div>
 
                 {userTokens.length === 0 ? (
                   <div className="text-center py-6">
                     <p className="text-gray-500">발급된 토큰이 없습니다.</p>
-                    <Button onClick={handleOpenCreateModal} className="mt-3">
-                      토큰 발급하기
-                    </Button>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -343,10 +318,10 @@ export default function UserDetailPage() {
                       <thead>
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            시스템
+                            상태
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            상태
+                            액세스 토큰
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             생성일
@@ -362,11 +337,11 @@ export default function UserDetailPage() {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {userTokens.map((token) => (
                           <tr key={token.id} className="hover:bg-gray-50">
-                            {/* <td className="px-4 py-3 text-sm">
-                              {token.systemName}
-                            </td> */}
                             <td className="px-4 py-3 text-sm">
                               {getTokenStatusLabel(token)}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-mono text-xs overflow-hidden truncate max-w-xs">
+                              {token.accessToken}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {formatTokenDate(token.createdAt)}
@@ -449,6 +424,6 @@ export default function UserDetailPage() {
           </div>
         </div>
       </Modal>
-    </>
+    </AdminLayout>
   );
 }

@@ -3,30 +3,21 @@
 import { useState, useEffect } from "react";
 import { Card, Button, TextField, Alert } from "../components/LumirMock";
 import { getAllUsers, searchUsers, User } from "../api/users";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AdminLayout from "../components/AdminLayout";
+import { getTokensByUser } from "../api/tokens";
 
-// 날짜를 한국어 형식으로 포맷하는 함수
-function formatDate(dateString?: string): string {
-  if (!dateString) return "-";
-  try {
-    return new Date(dateString).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  } catch {
-    return dateString;
-  }
-}
+// 사용자와 토큰 보유 여부를 저장하는 타입
+type UserWithToken = User & { hasToken: boolean };
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const router = useRouter();
+  const [users, setUsers] = useState<UserWithToken[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserWithToken[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortField, setSortField] = useState<keyof User>("name");
+  const [sortField, setSortField] = useState<keyof UserWithToken>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // 페이지네이션 상태 추가
@@ -44,10 +35,32 @@ export default function UsersPage() {
         const response = await getAllUsers();
         console.log("response", response);
         if (response.success && response.data) {
-          setUsers(response.data);
-          setFilteredUsers(response.data);
+          // 사용자 정보를 가져온 후 각 사용자의 토큰 정보도 조회
+          const usersWithTokenInfo = await Promise.all(
+            response.data.map(async (user) => {
+              try {
+                const tokenResponse = await getTokensByUser(user.id);
+                // hasToken이 항상 boolean 값을 갖도록 함
+                const hasToken = !!(
+                  tokenResponse.success &&
+                  tokenResponse.data &&
+                  tokenResponse.data.length > 0
+                );
+                return { ...user, hasToken };
+              } catch (error) {
+                console.error(
+                  `Error fetching tokens for user ${user.id}:`,
+                  error
+                );
+                return { ...user, hasToken: false };
+              }
+            })
+          );
+
+          setUsers(usersWithTokenInfo);
+          setFilteredUsers(usersWithTokenInfo);
           // 총 페이지 수 계산
-          setTotalPages(Math.ceil(response.data.length / itemsPerPage));
+          setTotalPages(Math.ceil(usersWithTokenInfo.length / itemsPerPage));
         } else {
           setError(
             response.error?.message || "사용자 목록을 불러오는데 실패했습니다."
@@ -77,8 +90,30 @@ export default function UsersPage() {
     try {
       const response = await searchUsers(searchQuery);
       if (response.success && response.data) {
-        setFilteredUsers(response.data);
-        setTotalPages(Math.ceil(response.data.length / itemsPerPage));
+        // 검색 결과에 대해서도 토큰 정보 조회
+        const usersWithTokenInfo = await Promise.all(
+          response.data.map(async (user) => {
+            try {
+              const tokenResponse = await getTokensByUser(user.id);
+              // hasToken이 항상 boolean 값을 갖도록 함
+              const hasToken = !!(
+                tokenResponse.success &&
+                tokenResponse.data &&
+                tokenResponse.data.length > 0
+              );
+              return { ...user, hasToken };
+            } catch (error) {
+              console.error(
+                `Error fetching tokens for user ${user.id}:`,
+                error
+              );
+              return { ...user, hasToken: false };
+            }
+          })
+        );
+
+        setFilteredUsers(usersWithTokenInfo);
+        setTotalPages(Math.ceil(usersWithTokenInfo.length / itemsPerPage));
         setCurrentPage(1); // 검색 시 첫 페이지로 이동
       } else {
         setError(response.error?.message || "검색에 실패했습니다.");
@@ -92,7 +127,7 @@ export default function UsersPage() {
   };
 
   // 정렬 처리
-  const handleSort = (field: keyof User) => {
+  const handleSort = (field: keyof UserWithToken) => {
     if (field === sortField) {
       // 같은 필드를 다시 클릭하면 방향 전환
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -116,7 +151,6 @@ export default function UsersPage() {
       // 날짜 필드의 경우 Date로 변환하여 비교
       if (
         sortField === "dateOfBirth" ||
-        sortField === "hireDate" ||
         sortField === "createdAt" ||
         sortField === "updatedAt"
       ) {
@@ -156,14 +190,14 @@ export default function UsersPage() {
     field,
     label,
   }: {
-    field: keyof User;
+    field: keyof UserWithToken;
     label: string;
   }) => (
     <th
-      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-50`}
+      className={`px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors`}
       onClick={() => handleSort(field)}
     >
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center justify-center space-x-1">
         <span>{label}</span>
         {sortField === field && (
           <span>{sortDirection === "asc" ? " ↑" : " ↓"}</span>
@@ -324,52 +358,58 @@ export default function UsersPage() {
                       <TableHeaderCell field="department" label="부서" />
                       <TableHeaderCell field="position" label="직위" />
                       <TableHeaderCell field="rank" label="직급" />
-                      <TableHeaderCell field="hireDate" label="입사일" />
                       <TableHeaderCell field="status" label="상태" />
-                      <th className="px-4 py-3 text-right">관리</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        토큰
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <tr
+                        key={user.id}
+                        className="hover:bg-indigo-50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/users/${user.id}`)}
+                      >
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           {user.employeeNumber}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-center">
                           {user.name}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           {user.email}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           {user.department || "-"}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           {user.position || "-"}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           {user.rank || "-"}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {formatDate(user.hireDate)}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
                           <span
-                            className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                            className={`inline-flex justify-center px-3 py-1 text-xs font-medium rounded-full ${
                               user.status === "재직중"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-700"
                             }`}
                           >
                             {user.status || "미설정"}
                           </span>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-right text-sm">
-                          <Link href={`/users/${user.id}`}>
-                            <Button size="sm" variant="outline">
-                              상세보기
-                            </Button>
-                          </Link>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
+                          <span
+                            className={`inline-flex justify-center px-3 py-1 text-xs font-medium rounded-full ${
+                              user.hasToken
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {user.hasToken ? "있음" : "없음"}
+                          </span>
                         </td>
                       </tr>
                     ))}
