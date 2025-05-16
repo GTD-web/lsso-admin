@@ -25,6 +25,7 @@ export default function TokensPage() {
     refreshAccessToken,
     removeToken,
     isTokenExpired,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     formatDate,
   } = useTokens();
 
@@ -235,28 +236,28 @@ export default function TokensPage() {
   // 토큰 테이블 렌더링 함수
   const renderTokenTable = (tokens: Token[]) => (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse">
+      <table className="min-w-full border-collapse table-fixed">
         <thead>
           <tr className="bg-gray-50 dark:bg-gray-800">
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[180px]">
               사용자
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[80px]">
               상태
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              토큰 만료일
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              리프레시 만료일
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-              마지막 접근
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
               생성일
             </th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+              접근일
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+              토큰 만료
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[100px]">
+              리프레시
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[250px]">
               관리
             </th>
           </tr>
@@ -271,7 +272,10 @@ export default function TokensPage() {
                 <div className="font-medium text-gray-900 dark:text-white">
                   {token.userName}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div
+                  className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[160px]"
+                  title={token.userEmail || "이메일 없음"}
+                >
                   {token.userEmail || "이메일 없음"}
                 </div>
               </td>
@@ -294,22 +298,50 @@ export default function TokensPage() {
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-center">
-                {formatDate(token.tokenExpiresAt)}
+                <div className="flex flex-col items-center">
+                  <span className="text-xs whitespace-nowrap">
+                    {formatDateShort(token.createdAt).dateOnly}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formatDateShort(token.createdAt).timeOnly}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-center">
-                {formatDate(token.refreshTokenExpiresAt)}
+                <div className="flex flex-col items-center">
+                  <span className="text-xs whitespace-nowrap">
+                    {formatDateShort(token.lastAccess).dateOnly}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formatDateShort(token.lastAccess).timeOnly}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-center">
-                {formatDate(token.lastAccess)}
+                <div className="flex flex-col items-center">
+                  <span className="text-xs whitespace-nowrap">
+                    {formatDateShort(token.tokenExpiresAt).dateOnly}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formatDateShort(token.tokenExpiresAt).timeOnly}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 text-center">
-                {formatDate(token.createdAt)}
+                <div className="flex flex-col items-center">
+                  <span className="text-xs whitespace-nowrap">
+                    {formatDateShort(token.refreshTokenExpiresAt).dateOnly}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {formatDateShort(token.refreshTokenExpiresAt).timeOnly}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3 text-sm">
-                <div className="flex flex-col items-center space-y-2">
+                <div className="flex flex-row flex-wrap items-center gap-2 justify-center">
                   <Button
                     size="sm"
-                    className="w-full"
+                    className="text-xs px-3 py-1 min-w-[80px]"
                     variant={token.isActive ? "outline" : "primary"}
                     onClick={() => handleToggleStatus(token.id, token.isActive)}
                     disabled={
@@ -323,7 +355,7 @@ export default function TokensPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full"
+                        className="text-xs px-3 py-1 min-w-[80px]"
                         onClick={() => handleRefreshAccessToken(token.id)}
                       >
                         액세스 갱신
@@ -334,7 +366,7 @@ export default function TokensPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="w-full"
+                      className="text-xs px-3 py-1 min-w-[80px]"
                       onClick={() => handleRenewToken(token)}
                     >
                       토큰 갱신
@@ -343,7 +375,7 @@ export default function TokensPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="w-full text-red-600 border-red-600 hover:bg-red-50"
+                    className="text-xs px-3 py-1 min-w-[60px] text-red-600 border-red-600 hover:bg-red-50"
                     onClick={() => handleDeleteToken(token.id)}
                   >
                     삭제
@@ -356,6 +388,25 @@ export default function TokensPage() {
       </table>
     </div>
   );
+
+  const formatDateShort = (dateStr: string | null | undefined) => {
+    if (!dateStr) return { dateOnly: "-", timeOnly: "-" };
+    const date = new Date(dateStr);
+
+    const dateOnly = date.toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    const timeOnly = date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    return { dateOnly, timeOnly };
+  };
 
   return (
     <AdminLayout title="토큰 관리">

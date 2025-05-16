@@ -49,13 +49,19 @@ export default function LogsPage() {
     host: "",
     startDate: undefined,
     endDate: undefined,
+    system: "",
   });
+
+  // 자동 갱신 관련 상태
+  const [refreshInterval, setRefreshInterval] = useState<number>(0); // 0은 자동 갱신 비활성화
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
   // Use debounced filter for text fields to avoid excessive API calls
   const [textInputs, setTextInputs] = useState({
     url: "",
     ip: "",
     host: "",
+    system: "",
   });
 
   const debouncedTextInputs = useDebounce(textInputs, 500);
@@ -73,13 +79,35 @@ export default function LogsPage() {
       url: debouncedTextInputs.url,
       ip: debouncedTextInputs.ip,
       host: debouncedTextInputs.host,
+      system: debouncedTextInputs.system,
     }));
   }, [debouncedTextInputs]);
+
+  // 자동 갱신 설정
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (refreshInterval > 0) {
+      intervalId = setInterval(() => {
+        fetchLogs();
+        setLastRefreshed(new Date());
+      }, refreshInterval * 1000);
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [refreshInterval, filter]);
 
   // 페이지 로드 시 로그 목록 불러오기
   useEffect(() => {
     fetchLogs();
   }, [filter]);
+
+  // 갱신 주기 변경 핸들러
+  const handleRefreshIntervalChange = (interval: number) => {
+    setRefreshInterval(interval);
+  };
 
   const fetchLogs = async () => {
     setIsFiltering(true);
@@ -114,6 +142,7 @@ export default function LogsPage() {
       url: "",
       ip: "",
       host: "",
+      system: "",
     });
     setFilter({
       page: 1,
@@ -128,6 +157,7 @@ export default function LogsPage() {
       host: "",
       startDate: undefined,
       endDate: undefined,
+      system: "",
     });
   };
 
@@ -337,6 +367,22 @@ export default function LogsPage() {
                 />
               </div>
 
+              {/* 시스템 필터 */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  시스템
+                </label>
+                <input
+                  type="text"
+                  value={textInputs.system}
+                  onChange={(e) =>
+                    handleTextInputChange("system", e.target.value)
+                  }
+                  placeholder="시스템 이름 검색..."
+                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
+                />
+              </div>
+
               {/* 정렬 방식 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -348,7 +394,7 @@ export default function LogsPage() {
                     onChange={(e) =>
                       handleFilterChange("sortBy", e.target.value)
                     }
-                    className="w-3/5 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
+                    className="w-1/2 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
                   >
                     <option value="requestTimestamp">시간</option>
                     <option value="method">메소드</option>
@@ -364,7 +410,7 @@ export default function LogsPage() {
                         e.target.value as SortDirection
                       )
                     }
-                    className="w-2/5 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
+                    className="w-1/2 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
                   >
                     <option value={SortDirection.DESC}>내림차순</option>
                     <option value={SortDirection.ASC}>오름차순</option>
@@ -422,12 +468,53 @@ export default function LogsPage() {
           {/* 로그 테이블 */}
           <Card className="overflow-hidden">
             <div className="relative overflow-x-auto">
+              {/* 자동 갱신 설정 UI */}
+              <div className="px-4 py-2 bg-gray-50 flex justify-end items-center text-xs text-gray-500 border-b">
+                <div className="flex items-center space-x-2">
+                  <span>
+                    {refreshInterval > 0
+                      ? `${refreshInterval}초마다 갱신 중`
+                      : "자동 갱신 꺼짐"}
+                  </span>
+                  <span className="mx-1">|</span>
+                  <span>마지막 갱신: {lastRefreshed.toLocaleTimeString()}</span>
+                  <span className="mx-1">|</span>
+                  <div className="flex items-center space-x-1">
+                    <span>갱신 주기:</span>
+                    <select
+                      value={refreshInterval}
+                      onChange={(e) =>
+                        handleRefreshIntervalChange(Number(e.target.value))
+                      }
+                      className="border border-gray-300 rounded text-xs py-0.5 px-1 bg-white"
+                    >
+                      <option value="0">끄기</option>
+                      <option value="5">5초</option>
+                      <option value="15">15초</option>
+                      <option value="30">30초</option>
+                      <option value="60">60초</option>
+                    </select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs px-2 py-0.5 ml-1"
+                      onClick={() => {
+                        fetchLogs();
+                        setLastRefreshed(new Date());
+                      }}
+                    >
+                      지금 갱신
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {isLoading ? (
                 <div className="flex justify-center items-center py-20">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                   <p className="ml-3 text-gray-600">데이터를 불러오는 중...</p>
                 </div>
-              ) : logs.length === 0 ? (
+              ) : logs && logs.length === 0 ? (
                 <div className="text-center py-16">
                   <p className="text-gray-500">로그 정보가 없습니다.</p>
                 </div>
@@ -443,16 +530,22 @@ export default function LogsPage() {
                           메소드
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          URL
+                          상태
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          상태
+                          URL
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           응답 시간
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          관리
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          IP 주소
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          호스트
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          시스템
                         </th>
                       </tr>
                     </thead>
@@ -464,9 +557,9 @@ export default function LogsPage() {
                           onClick={() => handleViewLog(log)}
                         >
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <div>{formatDate(log.timestamp)}</div>
+                            <div>{formatDate(log.requestTimestamp)}</div>
                             <div className="text-xs">
-                              {formatTime(log.timestamp)}
+                              {formatTime(log.requestTimestamp)}
                             </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -478,9 +571,6 @@ export default function LogsPage() {
                               {log.method}
                             </span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 max-w-xs truncate">
-                            {log.url}
-                          </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span
                               className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(
@@ -490,20 +580,26 @@ export default function LogsPage() {
                               {log.statusCode || "N/A"}
                             </span>
                           </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 max-w-xs truncate">
+                            {log.url}
+                          </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {log.responseTime ? `${log.responseTime}ms` : "N/A"}
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewLog(log);
-                              }}
-                            >
-                              상세보기
-                            </Button>
+                          <td
+                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-[150px] truncate"
+                            title={log.ip}
+                          >
+                            {log.ip || "-"}
+                          </td>
+                          <td
+                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-[150px] truncate"
+                            title={log.host}
+                          >
+                            {log.host || "-"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {log.system || "-"}
                           </td>
                         </tr>
                       ))}
@@ -602,8 +698,8 @@ export default function LogsPage() {
                         요청 시간
                       </h4>
                       <p className="text-sm">
-                        {formatDate(selectedLog.timestamp)}{" "}
-                        {formatTime(selectedLog.timestamp)}
+                        {formatDate(selectedLog.requestTimestamp)}{" "}
+                        {formatTime(selectedLog.requestTimestamp)}
                       </p>
                     </div>
                     <div>
@@ -633,6 +729,14 @@ export default function LogsPage() {
                         </span>
                       </div>
                     </div>
+                    {selectedLog.system && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500">
+                          시스템
+                        </h4>
+                        <p className="text-sm">{selectedLog.system}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 

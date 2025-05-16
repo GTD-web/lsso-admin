@@ -3,7 +3,7 @@ import { ApiResponse } from "./types";
 
 export type Log = {
   id: string;
-  timestamp: string;
+  requestTimestamp: string;
   method: string;
   url: string;
   query?: Record<string, unknown>;
@@ -16,6 +16,7 @@ export type Log = {
   ip: string;
   host: string;
   userAgent?: string;
+  system?: string;
 };
 
 export type LogsResponse = {
@@ -39,6 +40,7 @@ export type LogFilterParams = {
   errorsOnly?: boolean;
   sortBy?: string;
   sortDirection?: "ASC" | "DESC";
+  system?: string;
 };
 
 // 로그 목록 조회
