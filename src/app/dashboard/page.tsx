@@ -19,6 +19,8 @@ import {
   getTokenStats,
 } from "../api/dashboard";
 import AdminLayout from "../components/AdminLayout";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +32,14 @@ export default function Dashboard() {
   const [loginStats, setLoginStats] = useState<LoginStats | null>(null);
   const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/unauthorized");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // 대시보드 데이터 로드
   useEffect(() => {
@@ -149,16 +159,30 @@ export default function Dashboard() {
     }
   };
 
-  return (
-    <AdminLayout>
-      <div className="flex-1 p-4 lg:p-8 bg-slate-50 dark:bg-slate-900 overflow-auto content-scrollable">
-        <div className="max-w-7xl mx-auto">
-          {isLoading ? (
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex-1 p-4 lg:p-8 bg-slate-50 dark:bg-slate-900 overflow-auto content-scrollable">
+          <div className="max-w-7xl mx-auto">
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
               <p className="ml-3 text-gray-600">데이터를 불러오는 중...</p>
             </div>
-          ) : dashboardData ? (
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <AdminLayout>
+      <div className="flex-1 p-4 lg:p-8 bg-slate-50 dark:bg-slate-900 overflow-auto content-scrollable">
+        <div className="max-w-7xl mx-auto">
+          {dashboardData ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 mb-6">
                 {/* 카드 1: 활성 사용자 */}
