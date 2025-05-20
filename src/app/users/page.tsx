@@ -5,7 +5,7 @@ import { Card, Button, TextField, Alert } from "../components/LumirMock";
 import { getAllUsers, searchUsers, User } from "../api/users";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../components/AdminLayout";
-import { getTokensByUser } from "../api/tokens";
+// import { getTokensByUser } from "../api/tokens";
 
 // 사용자와 토큰 보유 여부를 저장하는 타입
 type UserWithToken = User; //& { hasToken: boolean };
@@ -31,31 +31,30 @@ export default function UsersPage() {
       setLoading(true);
       setError(null);
       try {
-        console.log("fetchUsers");
         const response = await getAllUsers();
-        console.log("response", response);
         if (response.success && response.data) {
           // 사용자 정보를 가져온 후 각 사용자의 토큰 정보도 조회
-          const usersWithTokenInfo = await Promise.all(
-            response.data.map(async (user) => {
-              try {
-                const tokenResponse = await getTokensByUser(user.id);
-                // hasToken이 항상 boolean 값을 갖도록 함
-                const hasToken = !!(
-                  tokenResponse.success &&
-                  tokenResponse.data &&
-                  tokenResponse.data.length > 0
-                );
-                return { ...user, hasToken };
-              } catch (error) {
-                console.error(
-                  `Error fetching tokens for user ${user.id}:`,
-                  error
-                );
-                return { ...user, hasToken: false };
-              }
-            })
-          );
+          const usersWithTokenInfo = response.data;
+          // const usersWithTokenInfo = await Promise.all(
+          //   response.data.map(async (user) => {
+          //     try {
+          //       const tokenResponse = await getTokensByUser(user.id);
+          //       // hasToken이 항상 boolean 값을 갖도록 함
+          //       const hasToken = !!(
+          //         tokenResponse.success &&
+          //         tokenResponse.data &&
+          //         tokenResponse.data.length > 0
+          //       );
+          //       return { ...user, hasToken };
+          //     } catch (error) {
+          //       console.error(
+          //         `Error fetching tokens for user ${user.id}:`,
+          //         error
+          //       );
+          //       return { ...user, hasToken: false };
+          //     }
+          //   })
+          // );
 
           setUsers(usersWithTokenInfo);
           setFilteredUsers(usersWithTokenInfo);
