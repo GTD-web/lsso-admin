@@ -8,7 +8,7 @@ import AdminLayout from "../components/AdminLayout";
 import { getTokensByUser } from "../api/tokens";
 
 // 사용자와 토큰 보유 여부를 저장하는 타입
-type UserWithToken = User & { hasToken: boolean };
+type UserWithToken = User; //& { hasToken: boolean };
 
 export default function UsersPage() {
   const router = useRouter();
@@ -91,26 +91,27 @@ export default function UsersPage() {
       const response = await searchUsers(searchQuery);
       if (response.success && response.data) {
         // 검색 결과에 대해서도 토큰 정보 조회
-        const usersWithTokenInfo = await Promise.all(
-          response.data.map(async (user) => {
-            try {
-              const tokenResponse = await getTokensByUser(user.id);
-              // hasToken이 항상 boolean 값을 갖도록 함
-              const hasToken = !!(
-                tokenResponse.success &&
-                tokenResponse.data &&
-                tokenResponse.data.length > 0
-              );
-              return { ...user, hasToken };
-            } catch (error) {
-              console.error(
-                `Error fetching tokens for user ${user.id}:`,
-                error
-              );
-              return { ...user, hasToken: false };
-            }
-          })
-        );
+        const usersWithTokenInfo = response.data;
+        // const usersWithTokenInfo = await Promise.all(
+        //   response.data.map(async (user) => {
+        //     try {
+        //       const tokenResponse = await getTokensByUser(user.id);
+        //       // hasToken이 항상 boolean 값을 갖도록 함
+        //       const hasToken = !!(
+        //         tokenResponse.success &&
+        //         tokenResponse.data &&
+        //         tokenResponse.data.length > 0
+        //       );
+        //       return { ...user, hasToken };
+        //     } catch (error) {
+        //       console.error(
+        //         `Error fetching tokens for user ${user.id}:`,
+        //         error
+        //       );
+        //       return { ...user, hasToken: false };
+        //     }
+        //   })
+        // );
 
         setFilteredUsers(usersWithTokenInfo);
         setTotalPages(Math.ceil(usersWithTokenInfo.length / itemsPerPage));

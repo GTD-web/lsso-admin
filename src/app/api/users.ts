@@ -19,6 +19,7 @@ export interface User {
   rank?: string;
   createdAt: string;
   updatedAt: string;
+  hasToken?: boolean;
 }
 
 // API 응답 타입 정의
