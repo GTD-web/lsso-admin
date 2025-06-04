@@ -2,13 +2,22 @@
 
 import { useState, useEffect } from "react";
 import { Card, Button, TextField, Alert } from "../components/LumirMock";
-import { getAllUsers, searchUsers, User } from "../api/users";
+import {
+  getAllUsers,
+  searchUsers,
+  User,
+  sendInitPassSetMail,
+  sendTempPasswordMail,
+  sendInitPassSetMailToAll,
+} from "../api/users";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../components/AdminLayout";
 // import { getTokensByUser } from "../api/tokens";
 
 // 사용자와 토큰 보유 여부를 저장하는 타입
 type UserWithToken = User; //& { hasToken: boolean };
+
+// API 호출 함수 제거 (users.ts로 이동됨)
 
 export default function UsersPage() {
   const router = useRouter();
@@ -24,6 +33,25 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+
+  // 페이지 클릭 이벤트 핸들러 추가
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // 메일 아이콘이나 드롭다운 메뉴를 클릭한 경우가 아닐 때만 드롭다운 닫기
+      if (!target.closest('[id^="dropdown-"]') && !target.closest("button")) {
+        const allDropdowns = document.querySelectorAll('[id^="dropdown-"]');
+        allDropdowns.forEach((dropdown) => {
+          dropdown.classList.add("hidden");
+        });
+      }
+    };
+
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
 
   // 유저 목록 조회
   useEffect(() => {
@@ -326,6 +354,34 @@ export default function UsersPage() {
               <Button onClick={handleSearch} className="ml-2">
                 검색
               </Button>
+              <Button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "새로운 사용자들에게 초기 비밀번호 설정 메일을 발송하시겠습니까?"
+                    )
+                  ) {
+                    sendInitPassSetMailToAll()
+                      .then((res) => {
+                        if (res.success) {
+                          alert(
+                            "새로운 사용자들에게 초기 비밀번호 설정 메일이 발송되었습니다."
+                          );
+                        } else {
+                          alert(
+                            res.error?.message || "메일 발송에 실패했습니다."
+                          );
+                        }
+                      })
+                      .catch(() => {
+                        alert("메일 발송 중 오류가 발생했습니다.");
+                      });
+                  }
+                }}
+                className="ml-2 bg-red-600 hover:bg-red-700"
+              >
+                초기 비밀번호 설정
+              </Button>
             </div>
           </div>
 
@@ -361,6 +417,9 @@ export default function UsersPage() {
                       <TableHeaderCell field="status" label="상태" />
                       <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
                         토큰
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        액션
                       </th>
                     </tr>
                   </thead>
@@ -410,6 +469,145 @@ export default function UsersPage() {
                           >
                             {user.hasToken ? "있음" : "없음"}
                           </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
+                          {user.status === "재직중" && (
+                            <div className="relative inline-block text-left">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const currentDropdown =
+                                    document.getElementById(
+                                      `dropdown-${user.id}`
+                                    );
+
+                                  // 현재 드롭다운이 열려있는지 확인
+                                  const isOpen =
+                                    currentDropdown &&
+                                    !currentDropdown.classList.contains(
+                                      "hidden"
+                                    );
+
+                                  // 모든 드롭다운 메뉴 닫기
+                                  const allDropdowns =
+                                    document.querySelectorAll(
+                                      '[id^="dropdown-"]'
+                                    );
+                                  allDropdowns.forEach((dropdown) => {
+                                    dropdown.classList.add("hidden");
+                                  });
+
+                                  // 현재 드롭다운이 닫혀있었다면 열기
+                                  if (!isOpen && currentDropdown) {
+                                    currentDropdown.classList.remove("hidden");
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center w-8 h-8 text-gray-600 hover:text-blue-600 focus:outline-none"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-5 w-5"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                >
+                                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                                </svg>
+                              </button>
+                              <div
+                                id={`dropdown-${user.id}`}
+                                className="hidden absolute right-8 top-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                              >
+                                <div
+                                  className="py-1"
+                                  role="menu"
+                                  aria-orientation="vertical"
+                                >
+                                  {!user.isInitialPasswordSet && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const dropdown =
+                                          document.getElementById(
+                                            `dropdown-${user.id}`
+                                          );
+                                        if (dropdown) {
+                                          dropdown.classList.add("hidden");
+                                        }
+                                        if (
+                                          window.confirm(
+                                            "초기 비밀번호 설정 메일을 발송하시겠습니까?"
+                                          )
+                                        ) {
+                                          sendInitPassSetMail(user.email)
+                                            .then((res) => {
+                                              if (res.success) {
+                                                alert(
+                                                  "초기 비밀번호 설정 메일이 발송되었습니다."
+                                                );
+                                              } else {
+                                                alert(
+                                                  res.error?.message ||
+                                                    "메일 발송에 실패했습니다."
+                                                );
+                                              }
+                                            })
+                                            .catch(() => {
+                                              alert(
+                                                "메일 발송 중 오류가 발생했습니다."
+                                              );
+                                            });
+                                        }
+                                      }}
+                                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      role="menuitem"
+                                    >
+                                      초기 비밀번호 설정
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const dropdown = document.getElementById(
+                                        `dropdown-${user.id}`
+                                      );
+                                      if (dropdown) {
+                                        dropdown.classList.add("hidden");
+                                      }
+                                      if (
+                                        window.confirm(
+                                          `${user.name} 님의 임시 비밀번호를 발급하시겠습니까?\n발급 즉시 비밀번호가 변경됩니다.`
+                                        )
+                                      ) {
+                                        sendTempPasswordMail(user.email)
+                                          .then((res) => {
+                                            if (res.success) {
+                                              alert(
+                                                "임시 비밀번호가 발급되었습니다."
+                                              );
+                                            } else {
+                                              alert(
+                                                res.error?.message ||
+                                                  "임시 비밀번호 발급에 실패했습니다."
+                                              );
+                                            }
+                                          })
+                                          .catch(() => {
+                                            alert(
+                                              "임시 비밀번호 발급 중 오류가 발생했습니다."
+                                            );
+                                          });
+                                      }
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    role="menuitem"
+                                  >
+                                    임시 비밀번호 발급
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

@@ -1,7 +1,7 @@
 "use server";
 
 import { ApiResponse } from "./types";
-import { apiGet } from "./apiClient";
+import { apiGet, apiPost } from "./apiClient";
 
 // 유저 정보 인터페이스 정의
 export interface User {
@@ -20,6 +20,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   hasToken?: boolean;
+  isInitialPasswordSet?: boolean;
 }
 
 // API 응답 타입 정의
@@ -138,6 +139,90 @@ export async function searchUsers(query: string): Promise<ApiResponse<User[]>> {
     return {
       success: true,
       data: [],
+    };
+  }
+}
+
+/**
+ * 초기 비밀번호 설정 메일을 발송하는 API 함수
+ * @param email 사용자 이메일
+ * @returns API 응답
+ */
+export async function sendInitPassSetMail(
+  email: string
+): Promise<ApiResponse<void>> {
+  try {
+    console.log(`sendInitPassSetMail - 실제 API 호출: ${email}`);
+    const token = getAuthToken();
+    const response = await apiPost<void>(
+      "/admin/users/send-init-pass-set-mail",
+      { email },
+      { token }
+    );
+    return response;
+  } catch (error) {
+    console.error(`sendInitPassSetMail 에러: ${email}`, error);
+    return {
+      success: false,
+      error: {
+        code: "MAIL_SEND_ERROR",
+        message: "초기 비밀번호 설정 메일 발송에 실패했습니다.",
+      },
+    };
+  }
+}
+
+/**
+ * 임시 비밀번호 발급 메일을 발송하는 API 함수
+ * @param email 사용자 이메일
+ * @returns API 응답
+ */
+export async function sendTempPasswordMail(
+  email: string
+): Promise<ApiResponse<void>> {
+  try {
+    console.log(`sendTempPasswordMail - 실제 API 호출: ${email}`);
+    const token = getAuthToken();
+    const response = await apiPost<void>(
+      "/admin/users/send-temp-password-mail",
+      { email },
+      { token }
+    );
+    return response;
+  } catch (error) {
+    console.error(`sendTempPasswordMail 에러: ${email}`, error);
+    return {
+      success: false,
+      error: {
+        code: "MAIL_SEND_ERROR",
+        message: "임시 비밀번호 발급 메일 발송에 실패했습니다.",
+      },
+    };
+  }
+}
+
+/**
+ * 모든 사용자에게 초기 비밀번호 설정 메일을 발송하는 API 함수
+ * @returns API 응답
+ */
+export async function sendInitPassSetMailToAll(): Promise<ApiResponse<void>> {
+  try {
+    console.log("sendInitPassSetMailToAll - 실제 API 호출");
+    const token = getAuthToken();
+    const response = await apiPost<void>(
+      "/admin/users/send-init-pass-set-mail-to-all",
+      {},
+      { token }
+    );
+    return response;
+  } catch (error) {
+    console.error("sendInitPassSetMailToAll 에러:", error);
+    return {
+      success: false,
+      error: {
+        code: "MAIL_SEND_ERROR",
+        message: "전체 초기 비밀번호 설정 메일 발송에 실패했습니다.",
+      },
     };
   }
 }
