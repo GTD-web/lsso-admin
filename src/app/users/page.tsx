@@ -8,7 +8,6 @@ import {
   User,
   sendInitPassSetMail,
   sendTempPasswordMail,
-  sendInitPassSetMailToAll,
 } from "../api/users";
 import { useRouter } from "next/navigation";
 import AdminLayout from "../components/AdminLayout";
@@ -19,6 +18,22 @@ type UserWithToken = User; //& { hasToken: boolean };
 
 // API 호출 함수 제거 (users.ts로 이동됨)
 
+// 파일 최상단에 스타일 추가
+const shimmerAnimation = `
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+}
+`;
+
 export default function UsersPage() {
   const router = useRouter();
   const [users, setUsers] = useState<UserWithToken[]>([]);
@@ -28,6 +43,16 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<keyof UserWithToken>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCount, setSelectedCount] = useState(0);
+  const [sentEmails, setSentEmails] = useState<Set<string>>(new Set());
+  const [selectedUserEmails, setSelectedUserEmails] = useState<Set<string>>(
+    new Set()
+  );
+  const [mailResult, setMailResult] = useState<{
+    success: number;
+    fail: number;
+  } | null>(null);
 
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
@@ -319,9 +344,36 @@ export default function UsersPage() {
     return pages;
   };
 
+  // 체크박스 상태 변경 핸들러
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checkboxes = document.querySelectorAll(
+      'input[type="checkbox"][name="user-checkbox"]'
+    );
+    checkboxes.forEach((checkbox) => {
+      if (checkbox instanceof HTMLInputElement) {
+        checkbox.checked = e.target.checked;
+      }
+    });
+    updateSelectedCount();
+  };
+
+  // 개별 체크박스 변경 핸들러
+  const handleIndividualCheckboxChange = () => {
+    updateSelectedCount();
+  };
+
+  // 선택된 체크박스 수 업데이트
+  const updateSelectedCount = () => {
+    const checkboxes = document.querySelectorAll(
+      'input[type="checkbox"][name="user-checkbox"]:checked'
+    );
+    setSelectedCount(checkboxes.length);
+  };
+
   console.log("user", users);
   return (
     <AdminLayout title="사용자 관리">
+      <style>{shimmerAnimation}</style>
       <div className="p-4 lg:p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
         <div className="max-w-7xl mx-auto">
           {/* 검색 및 필터 영역 */}
@@ -355,35 +407,264 @@ export default function UsersPage() {
                 검색
               </Button>
               <Button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "새로운 사용자들에게 초기 비밀번호 설정 메일을 발송하시겠습니까?"
-                    )
-                  ) {
-                    sendInitPassSetMailToAll()
-                      .then((res) => {
-                        if (res.success) {
-                          alert(
-                            "새로운 사용자들에게 초기 비밀번호 설정 메일이 발송되었습니다."
-                          );
-                        } else {
-                          alert(
-                            res.error?.message || "메일 발송에 실패했습니다."
-                          );
-                        }
-                      })
-                      .catch(() => {
-                        alert("메일 발송 중 오류가 발생했습니다.");
-                      });
-                  }
-                }}
+                onClick={() => setIsModalOpen(true)}
                 className="ml-2 bg-red-600 hover:bg-red-700"
               >
                 초기 비밀번호 설정
               </Button>
             </div>
           </div>
+
+          {/* 모달 */}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">초기 비밀번호 설정</h2>
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600">
+                      선택된 인원:{" "}
+                      <span className="font-semibold">{selectedCount}명</span>
+                    </span>
+                    <button
+                      onClick={() => {
+                        setSelectedUserEmails(new Set());
+                        setSentEmails(new Set());
+                        setSelectedCount(0);
+                        setMailResult(null);
+                        setIsModalOpen(false);
+                      }}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-y-auto flex-grow">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            onChange={handleCheckboxChange}
+                          />
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          이름
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          이메일
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          부서
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users
+                        .filter(
+                          (user) =>
+                            user.status === "재직중" &&
+                            !user.isInitialPasswordSet &&
+                            (selectedUserEmails.size === 0 ||
+                              selectedUserEmails.has(user.email))
+                        )
+                        .map((user) => (
+                          <tr
+                            key={user.id}
+                            className={`${
+                              sentEmails.has(user.email) ? "bg-green-50" : ""
+                            }`}
+                          >
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
+                              <input
+                                type="checkbox"
+                                name="user-checkbox"
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                onChange={handleIndividualCheckboxChange}
+                              />
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {user.name}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {user.email}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {user.department || "-"}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-4 flex justify-between items-center">
+                  <div className="flex-1 mr-4">
+                    <div className="w-full">
+                      <div className="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>메일 발송 진행률</span>
+                        {selectedUserEmails.size > 0 && (
+                          <span>
+                            <span className="font-semibold text-indigo-600">
+                              {sentEmails.size}
+                            </span>
+                            <span className="mx-1">/</span>
+                            <span className="font-semibold">
+                              {selectedUserEmails.size}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 relative overflow-hidden"
+                          style={{
+                            width: `${
+                              selectedUserEmails.size > 0
+                                ? (sentEmails.size / selectedUserEmails.size) *
+                                  100
+                                : 0
+                            }%`,
+                          }}
+                        >
+                          {selectedUserEmails.size > 0 &&
+                            sentEmails.size < selectedUserEmails.size && (
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                            )}
+                        </div>
+                      </div>
+                      {mailResult && (
+                        <div className="mt-2 text-sm">
+                          {mailResult.fail > 0 ? (
+                            <div className="text-gray-600">
+                              <span className="text-indigo-600 font-semibold">
+                                {mailResult.success}
+                              </span>
+                              명의 사용자에게 메일이 발송되었습니다.
+                              <br />
+                              <span className="text-red-600 font-semibold">
+                                {mailResult.fail}
+                              </span>
+                              명의 사용자에게 메일 발송에 실패했습니다.
+                            </div>
+                          ) : (
+                            <div className="text-gray-600">
+                              <span className="text-indigo-600 font-semibold">
+                                {mailResult.success}
+                              </span>
+                              명의 사용자에게 메일이 발송되었습니다.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        setSelectedUserEmails(new Set());
+                        setSentEmails(new Set());
+                        setSelectedCount(0);
+                        setMailResult(null);
+                        setIsModalOpen(false);
+                      }}
+                      variant="outline"
+                      className="text-indigo-600 border-indigo-600 hover:bg-indigo-50"
+                    >
+                      닫기
+                    </Button>
+                    {selectedCount > 0 && !selectedUserEmails.size && (
+                      <Button
+                        onClick={() => {
+                          const selectedUsers = users
+                            .filter(
+                              (user) =>
+                                user.status === "재직중" &&
+                                !user.isInitialPasswordSet
+                            )
+                            .filter((_, index) => {
+                              const checkboxes = document.querySelectorAll(
+                                'input[type="checkbox"][name="user-checkbox"]'
+                              );
+                              return (
+                                checkboxes[index] instanceof HTMLInputElement &&
+                                checkboxes[index].checked
+                              );
+                            });
+
+                          if (selectedUsers.length === 0) {
+                            alert("선택된 사용자가 없습니다.");
+                            return;
+                          }
+
+                          // 선택된 사용자들의 이메일을 저장
+                          setSelectedUserEmails(
+                            new Set(selectedUsers.map((user) => user.email))
+                          );
+
+                          if (
+                            window.confirm(
+                              `선택한 ${selectedUsers.length}명의 사용자에게 초기 비밀번호 설정 메일을 발송하시겠습니까?`
+                            )
+                          ) {
+                            Promise.all(
+                              selectedUsers.map((user) =>
+                                sendInitPassSetMail(user.email).then((res) => {
+                                  if (res.success) {
+                                    setSentEmails(
+                                      (prev) => new Set([...prev, user.email])
+                                    );
+                                  }
+                                  return res;
+                                })
+                              )
+                            )
+                              .then((results) => {
+                                const successCount = results.filter(
+                                  (res) => res.success
+                                ).length;
+                                const failCount =
+                                  selectedUsers.length - successCount;
+                                setMailResult({
+                                  success: successCount,
+                                  fail: failCount,
+                                });
+                              })
+                              .catch(() => {
+                                setMailResult({
+                                  success: 0,
+                                  fail: selectedUsers.length,
+                                });
+                              });
+                          } else {
+                            setSelectedUserEmails(new Set());
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        메일 발송
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 에러 메시지 */}
           {error && (
