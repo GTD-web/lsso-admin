@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, Button, Alert, Modal } from "../components/LumirMock";
 import { useLogs } from "../hooks/useLogs";
 import { Log, LogFilterParams } from "../api/logs";
@@ -72,48 +72,143 @@ export default function LogsPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [isFiltering, setIsFiltering] = useState(false);
 
-  // Apply debounced text inputs to filter
+  // 최신 filter 값을 참조하기 위한 ref
+  const filterRef = useRef(filter);
+
+  // API 호출 쓰로틀링을 위한 ref
+  const lastFetchTimeRef = useRef<number>(0);
+  const isInitialMount = useRef(true);
+
+  // filter 변경 시 ref 업데이트
   useEffect(() => {
-    setFilter((prev) => ({
-      ...prev,
-      url: debouncedTextInputs.url,
-      ip: debouncedTextInputs.ip,
-      host: debouncedTextInputs.host,
-      system: debouncedTextInputs.system,
-    }));
+    filterRef.current = filter;
+  }, [filter]);
+
+  // Apply debounced text inputs to filter (변경된 경우에만)
+  useEffect(() => {
+    console.log("🔄 debouncedTextInputs 변경 감지:", debouncedTextInputs);
+    setFilter((prev) => {
+      // 실제로 값이 변경된 경우에만 업데이트
+      if (
+        prev.url === debouncedTextInputs.url &&
+        prev.ip === debouncedTextInputs.ip &&
+        prev.host === debouncedTextInputs.host &&
+        prev.system === debouncedTextInputs.system
+      ) {
+        console.log("🔄 filter 값이 동일함 - 업데이트 스킵");
+        return prev; // 값이 같으면 업데이트하지 않음
+      }
+
+      const newFilter = {
+        ...prev,
+        url: debouncedTextInputs.url,
+        ip: debouncedTextInputs.ip,
+        host: debouncedTextInputs.host,
+        system: debouncedTextInputs.system,
+        page: 1, // 텍스트 필터 변경 시 첫 페이지로
+      };
+      console.log("🔄 filter 실제 업데이트:", newFilter);
+      return newFilter;
+    });
   }, [debouncedTextInputs]);
 
-  // 로그 목록 불러오기 함수
-  const fetchLogs = useCallback(async () => {
-    setIsFiltering(true);
-    const result = await filterByParams(filter);
-    if (result.meta) {
-      setTotalPages(result.meta.totalPages);
-      setTotalItems(result.meta.total);
-    }
-    setIsFiltering(false);
-  }, [filter, filterByParams, setIsFiltering, setTotalPages, setTotalItems]);
+  // 로그 목록 불러오기 함수 (쓰로틀링 포함)
+  const fetchLogs = async (forceRefresh = false) => {
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTimeRef.current;
 
-  // 자동 갱신 설정
+    // 강제 새로고침이 아니고, 마지막 호출로부터 1초가 지나지 않았으면 스킵
+    if (!forceRefresh && !isInitialMount.current && timeSinceLastFetch < 1000) {
+      console.log(
+        "🔄 fetchLogs 스킵 - 너무 빈번한 호출:",
+        timeSinceLastFetch + "ms"
+      );
+      return;
+    }
+
+    console.log("🔄 fetchLogs 실행 - filter:", filter);
+    lastFetchTimeRef.current = now;
+    isInitialMount.current = false;
+
+    setIsFiltering(true);
+    try {
+      const result = await filterByParams(filter);
+      if (result.meta) {
+        setTotalPages(result.meta.totalPages);
+        setTotalItems(result.meta.total);
+      }
+    } catch (error) {
+      console.error("로그 조회 중 오류 발생:", error);
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+  // 필터 변경 시 로그 목록 불러오기 (filter 직접 의존)
+  useEffect(() => {
+    const loadLogs = async () => {
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTimeRef.current;
+
+      // 마지막 호출로부터 1초가 지나지 않았으면 스킵
+      if (!isInitialMount.current && timeSinceLastFetch < 1000) {
+        console.log(
+          "🔄 filter 변경 스킵 - 너무 빈번한 호출:",
+          timeSinceLastFetch + "ms"
+        );
+        return;
+      }
+
+      console.log("🔄 filter 변경으로 인한 API 호출");
+      lastFetchTimeRef.current = now;
+      isInitialMount.current = false;
+
+      setIsFiltering(true);
+      try {
+        const result = await filterByParams(filter);
+        if (result.meta) {
+          setTotalPages(result.meta.totalPages);
+          setTotalItems(result.meta.total);
+        }
+      } catch (error) {
+        console.error("로그 조회 중 오류 발생:", error);
+      } finally {
+        setIsFiltering(false);
+      }
+    };
+
+    loadLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]); // filterByParams는 안정적인 함수이므로 의존성에서 제외
+
+  // 자동 갱신 설정 (refreshInterval만 의존, filterRef 사용)
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
 
     if (refreshInterval > 0) {
-      intervalId = setInterval(() => {
-        fetchLogs();
-        setLastRefreshed(new Date());
+      intervalId = setInterval(async () => {
+        console.log("🔄 자동 갱신 실행");
+        setIsFiltering(true);
+        try {
+          const result = await filterByParams(filterRef.current);
+          if (result.meta) {
+            setTotalPages(result.meta.totalPages);
+            setTotalItems(result.meta.total);
+          }
+        } catch (error) {
+          console.error("자동 갱신 중 오류 발생:", error);
+        } finally {
+          setIsFiltering(false);
+          setLastRefreshed(new Date());
+        }
       }, refreshInterval * 1000);
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [refreshInterval, filter, fetchLogs]);
-
-  // 페이지 로드 시 로그 목록 불러오기
-  useEffect(() => {
-    fetchLogs();
-  }, [fetchLogs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshInterval]); // filterByParams는 안정적인 함수이므로 의존성에서 제외
 
   // 갱신 주기 변경 핸들러
   const handleRefreshIntervalChange = (interval: number) => {
@@ -499,8 +594,9 @@ export default function LogsPage() {
                       size="sm"
                       variant="outline"
                       className="text-xs px-2 py-0.5 ml-1"
-                      onClick={() => {
-                        fetchLogs();
+                      onClick={async () => {
+                        console.log("🔄 수동 새로고침 클릭");
+                        await fetchLogs(true); // 강제 새로고침
                         setLastRefreshed(new Date());
                       }}
                     >
