@@ -2,7 +2,7 @@
 
 // 조직 관리 API용 직접 HTTP 클라이언트 (백엔드가 직접 데이터를 반환)
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3030" + "/api";
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3030") + "/api";
 
 /**
  * 조직 관리 API용 HTTP 요청 함수 (백엔드 직접 응답 처리)
