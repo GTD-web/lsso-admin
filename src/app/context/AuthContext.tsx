@@ -46,13 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const storedToken = localStorage.getItem(TOKEN_KEY);
         const storedUser = localStorage.getItem(USER_KEY);
-
+        console.log("🔍 저장된 데이터 확인:", {
+          storedToken,
+          storedUser,
+        });
         if (storedToken && storedUser) {
           // 토큰 검증
           const { success, data } = await verifyToken(storedToken);
-
+          console.log("🔍 토큰 검증 결과:", {
+            success,
+            data,
+          });
           if (success && data) {
-            setUser(data.admin);
+            setUser(data.user);
             setIsAuthenticated(true);
             // 새 토큰으로 갱신
             localStorage.setItem(TOKEN_KEY, data.accessToken);
@@ -62,19 +68,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (refreshToken) {
               const refreshResult = await refreshAuthToken(refreshToken);
               if (refreshResult.success && refreshResult.data) {
-                const { accessToken, refreshToken: newRefreshToken } =
-                  refreshResult.data;
-                localStorage.setItem(TOKEN_KEY, accessToken);
-                localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+                // 토큰 갱신 성공 시 새로운 토큰과 사용자 정보 저장
+                localStorage.setItem(TOKEN_KEY, refreshResult.data.accessToken);
+                localStorage.setItem(
+                  REFRESH_TOKEN_KEY,
+                  refreshResult.data.refreshToken
+                );
+                localStorage.setItem(
+                  USER_KEY,
+                  JSON.stringify(refreshResult.data.user)
+                );
 
-                // 토큰 갱신 후 다시 사용자 정보 검증
-                const verifyResult = await verifyToken(accessToken);
-                if (verifyResult.success && verifyResult.data) {
-                  setUser(verifyResult.data.admin);
-                  setIsAuthenticated(true);
-                } else {
-                  clearAuthData();
-                }
+                setUser(refreshResult.data.user);
+                setIsAuthenticated(true);
               } else {
                 clearAuthData();
               }
@@ -105,14 +111,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data,
         error: loginError,
       } = await adminLogin(email, password);
-
+      console.log("🔍 로그인 결과:", {
+        success,
+        data,
+        loginError,
+      });
       if (success && data) {
         // 로그인 성공 시 로컬 스토리지에 정보 저장
         localStorage.setItem(TOKEN_KEY, data.accessToken);
         localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(data.admin));
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
-        setUser(data.admin);
+        setUser(data.user);
         setIsAuthenticated(true);
         return true;
       } else {

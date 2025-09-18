@@ -6,7 +6,6 @@ import {
   adminLogin,
   verifyToken,
   refreshAuthToken,
-  adminLogout,
   User,
   AdminAuthData,
   // TokenResponse,
@@ -88,12 +87,12 @@ export function useAuth(): UseAuthReturn {
         if (tokenResponse.success && tokenResponse.data) {
           console.log("토큰 검증 성공. 데이터:", tokenResponse.data);
           setIsAuthenticated(true);
-          setUser(tokenResponse.data.admin);
+          setUser(tokenResponse.data.user);
 
           // Update userData in localStorage
           localStorage.setItem(
             "userData",
-            JSON.stringify(tokenResponse.data.admin)
+            JSON.stringify(tokenResponse.data.user)
           );
 
           // Refresh token if needed
@@ -124,10 +123,10 @@ export function useAuth(): UseAuthReturn {
 
                 if (verifyAfterRefresh.success && verifyAfterRefresh.data) {
                   setIsAuthenticated(true);
-                  setUser(verifyAfterRefresh.data.admin);
+                  setUser(verifyAfterRefresh.data.user);
                   localStorage.setItem(
                     "userData",
-                    JSON.stringify(verifyAfterRefresh.data.admin)
+                    JSON.stringify(verifyAfterRefresh.data.user)
                   );
                 } else {
                   console.log("토큰 갱신 후 검증 실패");
@@ -178,10 +177,10 @@ export function useAuth(): UseAuthReturn {
 
         localStorage.setItem("authToken", response.data.accessToken);
         localStorage.setItem("refreshToken", response.data.refreshToken);
-        localStorage.setItem("userData", JSON.stringify(response.data.admin));
+        localStorage.setItem("userData", JSON.stringify(response.data.user));
 
         setIsAuthenticated(true);
-        setUser(response.data.admin);
+        setUser(response.data.user);
         return response;
       } else {
         const errorMsg = response.error?.message || "로그인에 실패했습니다.";
@@ -210,15 +209,12 @@ export function useAuth(): UseAuthReturn {
     setIsLoading(true);
 
     try {
-      const token = localStorage.getItem("authToken") || "";
-      const refreshToken = localStorage.getItem("refreshToken") || "";
-
-      await adminLogout(token, refreshToken);
+      // SSO에서는 단순히 로컬 데이터만 정리
       clearAuthData();
       router.push("/");
     } catch (error) {
       console.error("로그아웃 오류:", error);
-      // Even if the server logout fails, we'll still clear local auth
+      // Even if clearing fails, still navigate to home
       clearAuthData();
     } finally {
       setIsLoading(false);

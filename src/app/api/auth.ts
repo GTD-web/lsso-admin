@@ -1,7 +1,7 @@
-"use server";
+"use client";
 
 import { ApiResponse } from "./types";
-import { apiPost, safeApiRequest } from "./apiClient";
+import { apiPost } from "./apiClient";
 
 // 사용자 정보 타입
 export interface User {
@@ -11,190 +11,262 @@ export interface User {
   role: string;
 }
 
-// 인증 토큰 타입
-export interface AuthTokens {
+// SSO 로그인 응답 타입 (문서에 맞춤)
+export interface LoginResponse {
+  tokenType: string;
   accessToken: string;
+  expiresAt: string;
   refreshToken: string;
-}
-
-// 관리자 인증 응답 타입
-export interface AdminAuthData {
-  admin: User;
-  accessToken: string;
-  refreshToken: string;
-}
-
-// 로그인 요청 타입
-export interface LoginRequest {
+  refreshTokenExpiresAt: string;
+  id: string;
+  name: string;
   email: string;
-  password: string;
+  employeeNumber: string;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  hireDate?: string;
+  status: string;
+  department?: string;
+  position?: string;
+  rank?: string;
+  systemRoles?: Record<string, string[]>;
 }
 
-// 토큰 검증 요청 타입
-export interface TokenVerifyRequest {
-  token: string;
+// SSO 토큰 검증 응답 타입 (문서에 맞춤)
+export interface TokenVerifyResponse {
+  valid: boolean;
+  user_info: {
+    id: string;
+    name: string;
+    email: string;
+    employee_number: string;
+  };
+  expires_in: number;
 }
 
-// 토큰 갱신 요청 타입
-export interface TokenRefreshRequest {
-  refreshToken: string;
-}
-
-// 토큰 응답 타입
-export interface TokenResponse {
+// 관리자 인증 데이터 (AuthContext용)
+export interface AdminAuthData {
+  user: User;
   accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-// 로그아웃 요청 타입
-export interface LogoutRequest {
-  refreshToken: string;
+  refreshToken: string; // SSO에서 refresh token 지원
 }
 
 /**
- * Admin login authentication service
- * @param email - Admin email address
- * @param password - Admin password
- * @returns Authentication response with tokens and user data or error
+ * SSO 로그인 (관리자용)
+ * @param email - 사용자 이메일
+ * @param password - 사용자 비밀번호
+ * @returns 인증 응답 (토큰 및 사용자 데이터)
  */
 export async function adminLogin(
   email: string,
   password: string
 ): Promise<ApiResponse<AdminAuthData>> {
-  console.log("Admin login API 호출 시작:", { email });
+  console.log("SSO 로그인 API 호출 시작:", { email });
 
   try {
-    const result = await safeApiRequest<AdminAuthData>(
-      () => apiPost<AdminAuthData>("/admin/auth/login", { email, password }),
-      {
-        admin: {
-          id: "",
-          email: "",
-          name: "",
-          role: "",
+    // SSO 로그인 API 직접 호출
+    const response = await apiPost<LoginResponse>("/auth/login", {
+      grant_type: "password",
+      email,
+      password,
+    });
+
+    console.log("SSO 로그인 원본 응답:", response);
+
+    if (response.success && response.data) {
+      // SSO 응답을 AdminAuthData 형태로 변환
+      const adminAuthData: AdminAuthData = {
+        user: {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          role: "admin", // 기본 역할 설정
         },
-        accessToken: "",
-        refreshToken: "",
-      }
-    );
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+      };
 
-    console.log("Admin login API 응답:", result);
-    console.log("응답 구조:", JSON.stringify(result, null, 2));
+      console.log("변환된 인증 데이터:", adminAuthData);
 
-    // 응답에 필요한 데이터가 있는지 확인
-    if (result.success && result.data) {
-      return result;
+      return {
+        success: true,
+        data: adminAuthData,
+      };
     } else {
-      console.error("로그인 API 오류 또는 응답 형식 불일치:", result);
-      return result;
+      console.log("SSO 로그인 실패:", response.error);
+      return {
+        success: false,
+        data: {
+          user: { id: "", email: "", name: "", role: "" },
+          accessToken: "",
+          refreshToken: "",
+        },
+        error: response.error || {
+          code: "LOGIN_ERROR",
+          message: "로그인에 실패했습니다.",
+        },
+      };
     }
   } catch (error) {
-    console.error("Admin login API 호출 실패:", error);
-    throw error;
+    console.error("SSO 로그인 API 호출 실패:", error);
+    return {
+      success: false,
+      data: {
+        user: { id: "", email: "", name: "", role: "" },
+        accessToken: "",
+        refreshToken: "",
+      },
+      error: {
+        code: "LOGIN_ERROR",
+        message:
+          error instanceof Error ? error.message : "로그인에 실패했습니다.",
+      },
+    };
   }
 }
 
 /**
- * Verify the authentication token
- * @param token JWT token to verify
+ * SSO 토큰 검증
+ * @param token JWT access token
  * @returns Verification response with user data or error
  */
 export async function verifyToken(
   token: string
 ): Promise<ApiResponse<AdminAuthData>> {
-  return safeApiRequest<AdminAuthData>(
-    () => apiPost<AdminAuthData>("/admin/auth/verify", { token }),
-    {
-      admin: {
-        id: "",
-        email: "",
-        name: "",
-        role: "",
-      },
-      accessToken: "",
-      refreshToken: "",
+  console.log("🔍 토큰 검증 API 호출:", { token: token ? "존재" : "없음" });
+
+  try {
+    // SSO 토큰 검증 API 직접 호출
+    const response = await apiPost<TokenVerifyResponse>(
+      "/auth/verify",
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    console.log("🔍 토큰 검증 원본 응답:", response);
+
+    if (response.success && response.data && response.data.valid) {
+      // SSO 응답을 AdminAuthData 형태로 변환
+      const adminAuthData: AdminAuthData = {
+        user: {
+          id: response.data.user_info.id,
+          email: response.data.user_info.email,
+          name: response.data.user_info.name,
+          role: "admin", // 기본 역할 설정
+        },
+        accessToken: token, // 기존 토큰 유지
+        refreshToken: "", // 토큰 검증에서는 refresh token 없음
+      };
+
+      console.log("변환된 토큰 검증 데이터:", adminAuthData);
+
+      return {
+        success: true,
+        data: adminAuthData,
+      };
+    } else {
+      console.log("🔍 토큰 검증 실패:", response.error);
+      return {
+        success: false,
+        data: {
+          user: { id: "", email: "", name: "", role: "" },
+          accessToken: "",
+          refreshToken: "",
+        },
+        error: response.error || {
+          code: "TOKEN_VERIFY_ERROR",
+          message: "토큰이 유효하지 않습니다.",
+        },
+      };
     }
-  );
+  } catch (error) {
+    console.error("🔍 토큰 검증 실패:", error);
+    return {
+      success: false,
+      data: {
+        user: { id: "", email: "", name: "", role: "" },
+        accessToken: "",
+        refreshToken: "",
+      },
+      error: {
+        code: "TOKEN_VERIFY_ERROR",
+        message: "토큰 검증에 실패했습니다.",
+      },
+    };
+  }
 }
 
 /**
- * Refresh the authentication token
+ * SSO 토큰 갱신
  * @param refreshToken The refresh token
- * @returns New set of tokens or error
+ * @returns New tokens
  */
 export async function refreshAuthToken(
   refreshToken: string
-): Promise<ApiResponse<TokenResponse>> {
-  return safeApiRequest<TokenResponse>(
-    () => apiPost<TokenResponse>("/admin/auth/refresh", { refreshToken }),
-    {
-      accessToken: "",
-      refreshToken: "",
-      expiresIn: 0,
+): Promise<ApiResponse<AdminAuthData>> {
+  console.log("🔄 토큰 갱신 API 호출", {
+    refreshToken: refreshToken ? "존재" : "없음",
+  });
+
+  try {
+    // SSO 로그인 API를 refresh_token grant type으로 호출
+    const response = await apiPost<LoginResponse>("/auth/login", {
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    });
+
+    console.log("🔄 토큰 갱신 원본 응답:", response);
+
+    if (response.success && response.data) {
+      // SSO 응답을 AdminAuthData 형태로 변환
+      const adminAuthData: AdminAuthData = {
+        user: {
+          id: response.data.id,
+          email: response.data.email,
+          name: response.data.name,
+          role: "admin", // 기본 역할 설정
+        },
+        accessToken: response.data.accessToken,
+        refreshToken: response.data.refreshToken,
+      };
+
+      console.log("변환된 토큰 갱신 데이터:", adminAuthData);
+
+      return {
+        success: true,
+        data: adminAuthData,
+      };
+    } else {
+      console.log("🔄 토큰 갱신 실패:", response.error);
+      return {
+        success: false,
+        data: {
+          user: { id: "", email: "", name: "", role: "" },
+          accessToken: "",
+          refreshToken: "",
+        },
+        error: response.error || {
+          code: "TOKEN_REFRESH_ERROR",
+          message: "토큰 갱신에 실패했습니다.",
+        },
+      };
     }
-  );
-}
-
-/**
- * Get admin profile information
- * @param token The JWT access token
- * @returns Admin profile data or error
- */
-export async function getAdminProfile(
-  token: string
-): Promise<ApiResponse<User>> {
-  return safeApiRequest<User>(
-    () => apiPost<User>("/admin/auth/profile", {}, { token }),
-    {
-      id: "",
-      email: "",
-      name: "",
-      role: "",
-    }
-  );
-}
-
-/**
- * Change admin password
- * @param token The JWT access token
- * @param currentPassword Current password
- * @param newPassword New password
- * @returns Success status
- */
-export async function changeAdminPassword(
-  token: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<ApiResponse<{ success: boolean }>> {
-  return safeApiRequest<{ success: boolean }>(
-    () =>
-      apiPost<{ success: boolean }>(
-        "/admin/auth/password",
-        { currentPassword, newPassword },
-        { token }
-      ),
-    { success: false }
-  );
-}
-
-/**
- * Admin logout function
- * @param token - JWT access token
- * @param refreshToken - Refresh token to invalidate
- * @returns Success status
- */
-export async function adminLogout(
-  token: string,
-  refreshToken: string
-): Promise<ApiResponse<{ success: boolean }>> {
-  return safeApiRequest<{ success: boolean }>(
-    () =>
-      apiPost<{ success: boolean }>(
-        "/admin/auth/logout",
-        { refreshToken },
-        { token }
-      ),
-    { success: false }
-  );
+  } catch (error) {
+    console.error("🔄 토큰 갱신 실패:", error);
+    return {
+      success: false,
+      data: {
+        user: { id: "", email: "", name: "", role: "" },
+        accessToken: "",
+        refreshToken: "",
+      },
+      error: {
+        code: "TOKEN_REFRESH_ERROR",
+        message: "토큰 갱신에 실패했습니다.",
+      },
+    };
+  }
 }

@@ -27,15 +27,24 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(
     null
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [systemStatus, setSystemStatus] = useState<SystemStatus[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [recentLogs, setRecentLogs] = useState<Log[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loginStats, setLoginStats] = useState<LoginStats | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    console.log("🛡️ Dashboard 상태 체크:", {
+      authLoading,
+      isAuthenticated,
+    });
     if (!authLoading && !isAuthenticated) {
       router.push("/unauthorized");
     }
@@ -67,29 +76,39 @@ export default function Dashboard() {
     const loadIndividualData = async () => {
       try {
         const systemStatusResponse = await getSystemsStatus();
-        if (systemStatusResponse.success && systemStatusResponse.data) {
-          setSystemStatus(systemStatusResponse.data);
-        }
+        const currentSystemStatus =
+          systemStatusResponse.success && systemStatusResponse.data
+            ? systemStatusResponse.data
+            : [];
+        setSystemStatus(currentSystemStatus);
 
         const recentLogsResponse = await getRecentLogs(3);
-        if (recentLogsResponse.success && recentLogsResponse.data) {
-          setRecentLogs(recentLogsResponse.data);
-        }
+        const currentRecentLogs =
+          recentLogsResponse.success && recentLogsResponse.data
+            ? recentLogsResponse.data
+            : [];
+        setRecentLogs(currentRecentLogs);
 
         const loginStatsResponse = await getLoginStats();
-        if (loginStatsResponse.success && loginStatsResponse.data) {
-          setLoginStats(loginStatsResponse.data);
-        }
+        const currentLoginStats =
+          loginStatsResponse.success && loginStatsResponse.data
+            ? loginStatsResponse.data
+            : null;
+        setLoginStats(currentLoginStats);
 
         const securityAlertsResponse = await getSecurityAlerts();
-        if (securityAlertsResponse.success && securityAlertsResponse.data) {
-          setSecurityAlerts(securityAlertsResponse.data);
-        }
+        const currentSecurityAlerts =
+          securityAlertsResponse.success && securityAlertsResponse.data
+            ? securityAlertsResponse.data
+            : [];
+        setSecurityAlerts(currentSecurityAlerts);
 
         const tokenStatsResponse = await getTokenStats();
-        if (tokenStatsResponse.success && tokenStatsResponse.data) {
-          setTokenStats(tokenStatsResponse.data);
-        }
+        const currentTokenStats =
+          tokenStatsResponse.success && tokenStatsResponse.data
+            ? tokenStatsResponse.data
+            : null;
+        setTokenStats(currentTokenStats);
 
         const usersResponse = await getAllUsers();
         const users =
@@ -106,7 +125,7 @@ export default function Dashboard() {
         const constructedData: DashboardSummary = {
           activeUsers,
           totalUsers: users.length,
-          tokenStats: tokenStats || {
+          tokenStats: currentTokenStats || {
             total: 0,
             active: 0,
             inactive: 0,
@@ -114,16 +133,16 @@ export default function Dashboard() {
           },
           activeSystems,
           totalSystems: systems.length,
-          loginStats: loginStats || {
+          loginStats: currentLoginStats || {
             total: 0,
             success: 0,
             failed: 0,
             successRate: 0,
           },
-          avgResponseTime: calculateAvgResponseTime(recentLogs),
-          securityAlerts: securityAlerts || [],
-          recentLogs: recentLogs || [],
-          systemStatus: systemStatus || [],
+          avgResponseTime: calculateAvgResponseTime(currentRecentLogs),
+          securityAlerts: currentSecurityAlerts,
+          recentLogs: currentRecentLogs,
+          systemStatus: currentSystemStatus,
         };
 
         setDashboardData(constructedData);
@@ -158,7 +177,10 @@ export default function Dashboard() {
       return dateString;
     }
   };
-
+  console.log("🛡️ Dashboard 상태 체크:", {
+    isLoading,
+    isAuthenticated,
+  });
   if (isLoading) {
     return (
       <AdminLayout>

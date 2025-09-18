@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Button,
   Card,
@@ -74,17 +74,18 @@ export default function TokensPage() {
     };
 
     loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 토큰 목록 불러오기
-  const loadTokens = async () => {
+  const loadTokens = useCallback(async () => {
     const tokensData = await fetchAllTokens();
     setTokens(tokensData);
-  };
+  }, [fetchAllTokens, setTokens]);
 
   useEffect(() => {
     loadTokens();
-  }, [fetchAllTokens]);
+  }, [loadTokens]);
 
   // 토큰 갱신 모달 열기
   const handleRenewToken = (token: Token) => {

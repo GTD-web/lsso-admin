@@ -21,6 +21,13 @@ export default function ProtectedRoute({
   const router = useRouter();
 
   useEffect(() => {
+    console.log("🛡️ ProtectedRoute 상태 체크:", {
+      isLoading,
+      isAuthenticated,
+      requiredRole,
+      user,
+      userRole: user?.role,
+    });
     // If authentication check is complete and user is not authenticated, redirect to login
     if (!isLoading && !isAuthenticated) {
       router.push("/");

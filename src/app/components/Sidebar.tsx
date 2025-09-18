@@ -8,6 +8,7 @@ import {
   RiComputerLine,
   RiKey2Line,
   RiFileList3Line,
+  RiOrganizationChart,
   // RiSettings5Line,
 } from "react-icons/ri";
 import { IconType } from "react-icons";
@@ -61,7 +62,13 @@ SidebarItemProps) {
   );
 }
 
-type RouteKey = "dashboard" | "users" | "systems" | "tokens" | "logs"; // | "settings";
+type RouteKey =
+  | "dashboard"
+  | "users"
+  | "organization"
+  | "systems"
+  | "tokens"
+  | "logs"; // | "settings";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -124,6 +131,11 @@ export function Sidebar({
   > = {
     dashboard: { path: "/dashboard", label: "대시보드", icon: RiDashboardLine },
     users: { path: "/users", label: "사용자 관리", icon: RiUser3Line },
+    organization: {
+      path: "/organization",
+      label: "조직 관리",
+      icon: RiOrganizationChart,
+    },
     systems: { path: "/systems", label: "시스템 관리", icon: RiComputerLine },
     tokens: { path: "/tokens", label: "토큰 관리", icon: RiKey2Line },
     logs: { path: "/logs", label: "로그 관리", icon: RiFileList3Line },

@@ -70,7 +70,6 @@ export async function apiRequest<T>(
     });
 
     const responseData = await response.json();
-    console.log(`[API Response] ${method} ${url}:`, responseData);
 
     // 백엔드 응답을 프론트엔드의 ApiResponse 형식으로 변환
     // 백엔드가 ApiResponseDto를 사용하므로 그대로 사용
@@ -175,7 +174,6 @@ export async function safeApiRequest<T>(
 ): Promise<ApiResponse<T>> {
   try {
     const response = await apiCall();
-    console.log("[Safe API Response]", response);
     return response;
   } catch (error) {
     console.error("[Safe API Error]", error);

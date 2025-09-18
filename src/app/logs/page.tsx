@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, Button, Alert, Modal } from "../components/LumirMock";
 import { useLogs } from "../hooks/useLogs";
 import { Log, LogFilterParams } from "../api/logs";
@@ -83,6 +83,17 @@ export default function LogsPage() {
     }));
   }, [debouncedTextInputs]);
 
+  // 로그 목록 불러오기 함수
+  const fetchLogs = useCallback(async () => {
+    setIsFiltering(true);
+    const result = await filterByParams(filter);
+    if (result.meta) {
+      setTotalPages(result.meta.totalPages);
+      setTotalItems(result.meta.total);
+    }
+    setIsFiltering(false);
+  }, [filter, filterByParams, setIsFiltering, setTotalPages, setTotalItems]);
+
   // 자동 갱신 설정
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
@@ -97,26 +108,16 @@ export default function LogsPage() {
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [refreshInterval, filter]);
+  }, [refreshInterval, filter, fetchLogs]);
 
   // 페이지 로드 시 로그 목록 불러오기
   useEffect(() => {
     fetchLogs();
-  }, [filter]);
+  }, [fetchLogs]);
 
   // 갱신 주기 변경 핸들러
   const handleRefreshIntervalChange = (interval: number) => {
     setRefreshInterval(interval);
-  };
-
-  const fetchLogs = async () => {
-    setIsFiltering(true);
-    const result = await filterByParams(filter);
-    if (result.meta) {
-      setTotalPages(result.meta.totalPages);
-      setTotalItems(result.meta.total);
-    }
-    setIsFiltering(false);
   };
 
   // 필터 변경 처리
