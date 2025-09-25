@@ -107,7 +107,7 @@ export const DepartmentPanel = () => {
     // childDepartments가 없는 경우를 위한 fallback - parentDepartmentId 기반 트리 구성
     if (
       rootNodes.length === 0 ||
-      rootNodes.every((node) => node.children.length === 0)
+      rootNodes.every((node) => !node.children || node.children.length === 0)
     ) {
       console.log(
         "childDepartments가 없어서 parentDepartmentId 기반으로 트리 구성"
