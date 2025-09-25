@@ -1,13 +1,10 @@
-import { AuthProvider } from "./context/AuthContext";
-import "./globals.css";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-
-const inter = Inter({ subsets: ["latin"] });
+import "./globals.css";
+import { AuthProvider } from "./_context/auth-provider";
 
 export const metadata: Metadata = {
-  title: "LSSO - 로그인 시스템",
-  description: "로그인 시스템 관리 서비스",
+  title: "LSSO Admin",
+  description: "LSSO 시스템 관리자 패널",
 };
 
 export default function RootLayout({
@@ -17,7 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className={inter.className}>
+      <body className="antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

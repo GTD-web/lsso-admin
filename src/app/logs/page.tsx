@@ -1,918 +1,408 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Card, Button, Alert, Modal } from "../components/LumirMock";
-import { useLogs } from "../hooks/useLogs";
-import { Log, LogFilterParams } from "../api/logs";
-import { SortDirection } from "../hooks/useLogs";
-import AdminLayout from "../components/AdminLayout";
+/**
+ * 로그 관리 페이지
+ */
 
-// Debounce hook for inputs
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
+import { useState, useEffect } from "react";
+import { AdminLayout } from "@/components/layout/admin-layout";
+import { logsRepository, type Log, type LogFilterDto } from "@/api/v2";
+import { SortDirection } from "@/api/v2/admin/logs/entity/logs.entity";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { MagnifyingGlassIcon, FunnelIcon } from "@heroicons/react/24/outline";
+import { formatDate, formatRelativeTime } from "@/lib/utils";
 
 export default function LogsPage() {
-  const {
-    logs,
-    isLoading,
-    error,
-    filterByParams,
-    formatDate,
-    formatTime,
-    getStatusColor,
-    getMethodColor,
-  } = useLogs();
+  const [logs, setLogs] = useState<Log[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
-  const [filter, setFilter] = useState<LogFilterParams>({
+  // 필터 상태
+  const [filters, setFilters] = useState<LogFilterDto>({
     page: 1,
-    limit: 10,
-    method: "",
-    statusCode: undefined,
-    errorsOnly: false,
+    limit: 20,
     sortBy: "requestTimestamp",
     sortDirection: SortDirection.DESC,
-    url: "",
-    ip: "",
-    host: "",
-    startDate: undefined,
-    endDate: undefined,
-    system: "",
   });
 
-  // 자동 갱신 관련 상태
-  const [refreshInterval, setRefreshInterval] = useState<number>(0); // 0은 자동 갱신 비활성화
-  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-
-  // Use debounced filter for text fields to avoid excessive API calls
-  const [textInputs, setTextInputs] = useState({
-    url: "",
-    ip: "",
-    host: "",
-    system: "",
-  });
-
-  const debouncedTextInputs = useDebounce(textInputs, 500);
-
-  const [selectedLog, setSelectedLog] = useState<Log | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [isFiltering, setIsFiltering] = useState(false);
-
-  // 최신 filter 값을 참조하기 위한 ref
-  const filterRef = useRef(filter);
-
-  // API 호출 쓰로틀링을 위한 ref
-  const lastFetchTimeRef = useRef<number>(0);
-  const isInitialMount = useRef(true);
-
-  // filter 변경 시 ref 업데이트
   useEffect(() => {
-    filterRef.current = filter;
-  }, [filter]);
-
-  // Apply debounced text inputs to filter (변경된 경우에만)
-  useEffect(() => {
-    console.log("🔄 debouncedTextInputs 변경 감지:", debouncedTextInputs);
-    setFilter((prev) => {
-      // 실제로 값이 변경된 경우에만 업데이트
-      if (
-        prev.url === debouncedTextInputs.url &&
-        prev.ip === debouncedTextInputs.ip &&
-        prev.host === debouncedTextInputs.host &&
-        prev.system === debouncedTextInputs.system
-      ) {
-        console.log("🔄 filter 값이 동일함 - 업데이트 스킵");
-        return prev; // 값이 같으면 업데이트하지 않음
-      }
-
-      const newFilter = {
-        ...prev,
-        url: debouncedTextInputs.url,
-        ip: debouncedTextInputs.ip,
-        host: debouncedTextInputs.host,
-        system: debouncedTextInputs.system,
-        page: 1, // 텍스트 필터 변경 시 첫 페이지로
-      };
-      console.log("🔄 filter 실제 업데이트:", newFilter);
-      return newFilter;
-    });
-  }, [debouncedTextInputs]);
-
-  // 로그 목록 불러오기 함수 (쓰로틀링 포함)
-  const fetchLogs = async (forceRefresh = false) => {
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchTimeRef.current;
-
-    // 강제 새로고침이 아니고, 마지막 호출로부터 1초가 지나지 않았으면 스킵
-    if (!forceRefresh && !isInitialMount.current && timeSinceLastFetch < 1000) {
-      console.log(
-        "🔄 fetchLogs 스킵 - 너무 빈번한 호출:",
-        timeSinceLastFetch + "ms"
-      );
-      return;
-    }
-
-    console.log("🔄 fetchLogs 실행 - filter:", filter);
-    lastFetchTimeRef.current = now;
-    isInitialMount.current = false;
-
-    setIsFiltering(true);
-    try {
-      const result = await filterByParams(filter);
-      if (result.meta) {
-        setTotalPages(result.meta.totalPages);
-        setTotalItems(result.meta.total);
-      }
-    } catch (error) {
-      console.error("로그 조회 중 오류 발생:", error);
-    } finally {
-      setIsFiltering(false);
-    }
-  };
-
-  // 필터 변경 시 로그 목록 불러오기 (filter 직접 의존)
-  useEffect(() => {
-    const loadLogs = async () => {
-      const now = Date.now();
-      const timeSinceLastFetch = now - lastFetchTimeRef.current;
-
-      // 마지막 호출로부터 1초가 지나지 않았으면 스킵
-      if (!isInitialMount.current && timeSinceLastFetch < 1000) {
-        console.log(
-          "🔄 filter 변경 스킵 - 너무 빈번한 호출:",
-          timeSinceLastFetch + "ms"
-        );
-        return;
-      }
-
-      console.log("🔄 filter 변경으로 인한 API 호출");
-      lastFetchTimeRef.current = now;
-      isInitialMount.current = false;
-
-      setIsFiltering(true);
-      try {
-        const result = await filterByParams(filter);
-        if (result.meta) {
-          setTotalPages(result.meta.totalPages);
-          setTotalItems(result.meta.total);
-        }
-      } catch (error) {
-        console.error("로그 조회 중 오류 발생:", error);
-      } finally {
-        setIsFiltering(false);
-      }
-    };
-
     loadLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]); // filterByParams는 안정적인 함수이므로 의존성에서 제외
+  }, [page]);
 
-  // 자동 갱신 설정 (refreshInterval만 의존, filterRef 사용)
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
+  const loadLogs = async (filterData?: LogFilterDto) => {
+    setIsLoading(true);
+    setError(null);
 
-    if (refreshInterval > 0) {
-      intervalId = setInterval(async () => {
-        console.log("🔄 자동 갱신 실행");
-        setIsFiltering(true);
-        try {
-          const result = await filterByParams(filterRef.current);
-          if (result.meta) {
-            setTotalPages(result.meta.totalPages);
-            setTotalItems(result.meta.total);
-          }
-        } catch (error) {
-          console.error("자동 갱신 중 오류 발생:", error);
-        } finally {
-          setIsFiltering(false);
-          setLastRefreshed(new Date());
-        }
-      }, refreshInterval * 1000);
-    }
+    try {
+      const params = filterData || { page, limit };
+      const response = await logsRepository.getLogs(params);
 
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshInterval]); // filterByParams는 안정적인 함수이므로 의존성에서 제외
-
-  // 갱신 주기 변경 핸들러
-  const handleRefreshIntervalChange = (interval: number) => {
-    setRefreshInterval(interval);
-  };
-
-  // 필터 변경 처리
-  const handleFilterChange = (key: keyof LogFilterParams, value: unknown) => {
-    // 필터 변경 시 1페이지로 돌아감
-    if (key !== "page") {
-      setFilter((prev) => ({
-        ...prev,
-        [key]: value,
-        page: 1,
-      }));
-    } else {
-      setFilter((prev) => ({
-        ...prev,
-        [key]: typeof value === "number" ? value : 1,
-      }));
+      setLogs(response.logs || []);
+      setTotal(response.total || 0);
+      setPage(response.page || 1);
+    } catch (err) {
+      console.error("로그 목록 조회 실패:", err);
+      setError("로그 목록을 불러오는데 실패했습니다.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // 필터 초기화
-  const resetFilters = () => {
-    setTextInputs({
-      url: "",
-      ip: "",
-      host: "",
-      system: "",
-    });
-    setFilter({
-      page: 1,
-      limit: 10,
-      method: "",
-      statusCode: undefined,
-      errorsOnly: false,
-      sortBy: "requestTimestamp",
-      sortDirection: SortDirection.DESC,
-      url: "",
-      ip: "",
-      host: "",
-      startDate: undefined,
-      endDate: undefined,
-      system: "",
-    });
-  };
+  const handleFilter = async () => {
+    const filterData = { ...filters, page: 1 };
+    setFilters(filterData);
 
-  // 로그 상세 정보 모달 열기
-  const handleViewLog = (log: Log) => {
-    setSelectedLog(log);
-    setIsModalOpen(true);
-  };
-
-  // 페이지네이션 컨트롤
-  const goToPage = (page: number) => {
-    if (page < 1 || page > totalPages) return;
-    handleFilterChange("page", page);
-  };
-
-  // 상태 코드 텍스트
-  const getStatusText = (statusCode?: number): string => {
-    if (!statusCode) return "Unknown";
-
-    if (statusCode >= 200 && statusCode < 300) {
-      return "성공";
-    } else if (statusCode >= 400 && statusCode < 500) {
-      return "클라이언트 오류";
-    } else if (statusCode >= 500) {
-      return "서버 오류";
-    }
-
-    return "기타";
-  };
-
-  // JSON 데이터 표시 컴포넌트
-  const JsonView = ({
-    data,
-  }: {
-    data: Record<string, unknown> | undefined;
-  }) => {
-    if (!data || Object.keys(data).length === 0) {
-      return <div className="text-gray-500 italic">비어 있음</div>;
-    }
-
-    return (
-      <pre className="bg-gray-50 dark:bg-gray-800 p-3 rounded-md overflow-auto max-h-60 text-sm whitespace-pre-wrap break-all">
-        {JSON.stringify(data, null, 2)}
-      </pre>
-    );
-  };
-
-  // 날짜 값 변환 함수
-  const formatDateInput = (date: Date | undefined): string => {
-    if (!date) return "";
-    return date.toISOString().split("T")[0];
-  };
-
-  const handleDateChange = (field: "startDate" | "endDate", value: string) => {
-    if (value) {
-      handleFilterChange(field, new Date(value));
-    } else {
-      handleFilterChange(field, undefined);
+    try {
+      setIsLoading(true);
+      const response = await logsRepository.filterLogs(filterData);
+      setLogs(response.logs || []);
+      setTotal(response.total || 0);
+      setPage(1);
+    } catch (err) {
+      console.error("로그 필터링 실패:", err);
+      setError("로그 필터링에 실패했습니다.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // 텍스트 필터 입력 처리
-  const handleTextInputChange = (
-    key: keyof typeof textInputs,
-    value: string
-  ) => {
-    setTextInputs((prev) => ({
+  const handleFilterChange = (key: keyof LogFilterDto, value: any) => {
+    setFilters((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
+  const getStatusColor = (statusCode: number) => {
+    if (statusCode >= 200 && statusCode < 300)
+      return "text-green-600 bg-green-100";
+    if (statusCode >= 300 && statusCode < 400)
+      return "text-blue-600 bg-blue-100";
+    if (statusCode >= 400 && statusCode < 500)
+      return "text-orange-600 bg-orange-100";
+    if (statusCode >= 500) return "text-red-600 bg-red-100";
+    return "text-gray-600 bg-gray-100";
+  };
+
+  const getMethodColor = (method: string) => {
+    switch (method.toUpperCase()) {
+      case "GET":
+        return "text-blue-700 bg-blue-100";
+      case "POST":
+        return "text-green-700 bg-green-100";
+      case "PUT":
+        return "text-orange-700 bg-orange-100";
+      case "PATCH":
+        return "text-yellow-700 bg-yellow-100";
+      case "DELETE":
+        return "text-red-700 bg-red-100";
+      default:
+        return "text-gray-700 bg-gray-100";
+    }
+  };
+
+  const totalPages = Math.ceil(total / limit);
+
   return (
-    <AdminLayout title="로그 관리">
-      <div className="flex-1 p-8 bg-slate-50 dark:bg-slate-900 overflow-auto">
-        <div className="max-w-7xl mx-auto">
-          {/* 필터 영역 */}
-          <Card className="mb-6 p-4">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-medium">
-                로그 필터
-                {isFiltering && (
-                  <span className="ml-2 inline-block w-4 h-4">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                  </span>
-                )}
-              </h2>
-            </div>
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* 페이지 헤더 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">로그 관리</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              시스템 로그를 조회하고 분석합니다. (총 {total.toLocaleString()}개)
+            </p>
+          </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-              {/* 날짜 범위 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  시작일
-                </label>
-                <input
-                  type="date"
-                  value={formatDateInput(filter.startDate as Date | undefined)}
-                  onChange={(e) =>
-                    handleDateChange("startDate", e.target.value)
-                  }
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <FunnelIcon className="h-4 w-4 mr-2" />
+            필터
+          </Button>
+        </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  종료일
-                </label>
-                <input
-                  type="date"
-                  value={formatDateInput(filter.endDate as Date | undefined)}
-                  onChange={(e) => handleDateChange("endDate", e.target.value)}
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
-
-              {/* HTTP 메소드 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  HTTP 메소드
-                </label>
-                <select
-                  value={filter.method || ""}
-                  onChange={(e) =>
-                    handleFilterChange("method", e.target.value || undefined)
-                  }
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                >
-                  <option value="">전체</option>
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-              </div>
-
-              {/* 상태 코드 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  상태 코드
-                </label>
-                <select
-                  value={filter.statusCode?.toString() || ""}
-                  onChange={(e) =>
-                    handleFilterChange(
-                      "statusCode",
-                      e.target.value ? parseInt(e.target.value) : undefined
-                    )
-                  }
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                >
-                  <option value="">전체</option>
-                  <option value="200">200 (OK)</option>
-                  <option value="201">201 (Created)</option>
-                  <option value="400">400 (Bad Request)</option>
-                  <option value="401">401 (Unauthorized)</option>
-                  <option value="403">403 (Forbidden)</option>
-                  <option value="404">404 (Not Found)</option>
-                  <option value="500">500 (Server Error)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-              {/* URL 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  URL
-                </label>
-                <input
-                  type="text"
-                  value={textInputs.url}
-                  onChange={(e) => handleTextInputChange("url", e.target.value)}
-                  placeholder="URL 검색..."
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
-
-              {/* IP 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  IP 주소
-                </label>
-                <input
-                  type="text"
-                  value={textInputs.ip}
-                  onChange={(e) => handleTextInputChange("ip", e.target.value)}
-                  placeholder="예: 192.168.1.1"
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
-
-              {/* Host 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  호스트
-                </label>
-                <input
-                  type="text"
-                  value={textInputs.host}
-                  onChange={(e) =>
-                    handleTextInputChange("host", e.target.value)
-                  }
-                  placeholder="예: api.example.com"
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
-
-              {/* 시스템 필터 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  시스템
-                </label>
-                <input
-                  type="text"
-                  value={textInputs.system}
-                  onChange={(e) =>
-                    handleTextInputChange("system", e.target.value)
-                  }
-                  placeholder="시스템 이름 검색..."
-                  className="w-full rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                />
-              </div>
-
-              {/* 정렬 방식 */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  정렬
-                </label>
-                <div className="flex gap-1">
-                  <select
-                    value={filter.sortBy || "requestTimestamp"}
+        {/* 필터 패널 */}
+        {showFilters && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">로그 필터</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    시작일
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={filters.startDate || ""}
                     onChange={(e) =>
-                      handleFilterChange("sortBy", e.target.value)
+                      handleFilterChange("startDate", e.target.value)
                     }
-                    className="w-1/2 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                  >
-                    <option value="requestTimestamp">시간</option>
-                    <option value="method">메소드</option>
-                    <option value="url">URL</option>
-                    <option value="statusCode">상태</option>
-                    <option value="responseTime">응답시간</option>
-                  </select>
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    종료일
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={filters.endDate || ""}
+                    onChange={(e) =>
+                      handleFilterChange("endDate", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    HTTP 메서드
+                  </label>
                   <select
-                    value={filter.sortDirection || SortDirection.DESC}
+                    value={filters.method || ""}
+                    onChange={(e) =>
+                      handleFilterChange("method", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">전체</option>
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    상태 코드
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="예: 200, 404, 500"
+                    value={filters.statusCode || ""}
                     onChange={(e) =>
                       handleFilterChange(
-                        "sortDirection",
-                        e.target.value as SortDirection
+                        "statusCode",
+                        e.target.value ? parseInt(e.target.value) : undefined
                       )
                     }
-                    className="w-1/2 rounded-md border border-gray-300 text-sm px-2 py-1 bg-white"
-                  >
-                    <option value={SortDirection.DESC}>내림차순</option>
-                    <option value={SortDirection.ASC}>오름차순</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div>
-                  <input
-                    type="checkbox"
-                    id="errorsOnly"
-                    checked={filter.errorsOnly}
-                    onChange={(e) =>
-                      handleFilterChange("errorsOnly", e.target.checked)
-                    }
-                    className="rounded text-blue-600 mr-1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
-                  <label htmlFor="errorsOnly" className="text-xs text-gray-700">
-                    오류만 보기
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    IP 주소
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="예: 192.168.1.1"
+                    value={filters.ip || ""}
+                    onChange={(e) => handleFilterChange("ip", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    시스템
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="시스템명"
+                    value={filters.system || ""}
+                    onChange={(e) =>
+                      handleFilterChange("system", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.errorsOnly || false}
+                      onChange={(e) =>
+                        handleFilterChange("errorsOnly", e.target.checked)
+                      }
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">에러만 표시</span>
                   </label>
                 </div>
-
-                <select
-                  value={filter.limit?.toString() || "10"}
-                  onChange={(e) =>
-                    handleFilterChange("limit", parseInt(e.target.value))
-                  }
-                  className="rounded-md border border-gray-300 text-xs px-2 py-1 bg-white"
-                >
-                  <option value="10">10개씩</option>
-                  <option value="25">25개씩</option>
-                  <option value="50">50개씩</option>
-                  <option value="100">100개씩</option>
-                </select>
               </div>
 
-              <div>
-                <Button size="sm" variant="outline" onClick={resetFilters}>
-                  필터 초기화
+              <div className="flex justify-end space-x-3 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setFilters({ page: 1, limit: 20 })}
+                >
+                  초기화
+                </Button>
+                <Button onClick={handleFilter}>
+                  <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
+                  검색
                 </Button>
               </div>
-            </div>
+            </CardContent>
           </Card>
+        )}
 
-          {/* 에러 메시지 */}
-          {error && (
-            <Alert variant="error" className="mb-6">
-              {error}
-            </Alert>
-          )}
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+            {error}
+          </div>
+        )}
 
-          {/* 로그 테이블 */}
-          <Card className="overflow-hidden">
-            <div className="relative overflow-x-auto">
-              {/* 자동 갱신 설정 UI */}
-              <div className="px-4 py-2 bg-gray-50 flex justify-end items-center text-xs text-gray-500 border-b">
-                <div className="flex items-center space-x-2">
-                  <span>
-                    {refreshInterval > 0
-                      ? `${refreshInterval}초마다 갱신 중`
-                      : "자동 갱신 꺼짐"}
-                  </span>
-                  <span className="mx-1">|</span>
-                  <span>마지막 갱신: {lastRefreshed.toLocaleTimeString()}</span>
-                  <span className="mx-1">|</span>
-                  <div className="flex items-center space-x-1">
-                    <span>갱신 주기:</span>
-                    <select
-                      value={refreshInterval}
-                      onChange={(e) =>
-                        handleRefreshIntervalChange(Number(e.target.value))
-                      }
-                      className="border border-gray-300 rounded text-xs py-0.5 px-1 bg-white"
-                    >
-                      <option value="0">끄기</option>
-                      <option value="5">5초</option>
-                      <option value="15">15초</option>
-                      <option value="30">30초</option>
-                      <option value="60">60초</option>
-                    </select>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs px-2 py-0.5 ml-1"
-                      onClick={async () => {
-                        console.log("🔄 수동 새로고침 클릭");
-                        await fetchLogs(true); // 강제 새로고침
-                        setLastRefreshed(new Date());
-                      }}
-                    >
-                      지금 갱신
-                    </Button>
-                  </div>
-                </div>
+        {/* 로그 테이블 */}
+        <Card>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="text-center py-12 text-gray-500">
+                로그를 불러오는 중...
               </div>
-
-              {isLoading ? (
-                <div className="flex justify-center items-center py-20">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                  <p className="ml-3 text-gray-600">데이터를 불러오는 중...</p>
-                </div>
-              ) : logs && logs.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-gray-500">로그 정보가 없습니다.</p>
-                </div>
-              ) : (
-                <>
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          시간
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          메소드
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          상태
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          URL
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          응답 시간
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          IP 주소
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          호스트
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          시스템
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {logs.map((log) => (
-                        <tr
-                          key={log.id}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleViewLog(log)}
-                        >
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            <div>{formatDate(log.requestTimestamp)}</div>
-                            <div className="text-xs">
-                              {formatTime(log.requestTimestamp)}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+            ) : logs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        시간
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        메서드/URL
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        상태
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        응답시간
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        IP/시스템
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {logs.map((log) => (
+                      <tr
+                        key={log.id}
+                        className={`hover:bg-gray-50 ${
+                          log.isError ? "bg-red-50" : ""
+                        }`}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {formatRelativeTime(log.requestTimestamp)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(log.requestTimestamp, "time")}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center space-x-2">
                             <span
-                              className={`inline-flex px-2 py-1 text-xs rounded-full ${getMethodColor(
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getMethodColor(
                                 log.method
                               )}`}
                             >
                               {log.method}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(
-                                log.statusCode
-                              )}`}
-                            >
-                              {log.statusCode || "N/A"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 max-w-xs truncate">
-                            {log.url}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {log.responseTime ? `${log.responseTime}ms` : "N/A"}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-[150px] truncate"
-                            title={log.ip}
+                            <div className="text-sm text-gray-900 truncate max-w-xs">
+                              {log.url}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getStatusColor(
+                              log.statusCode
+                            )}`}
                           >
-                            {log.ip || "-"}
-                          </td>
-                          <td
-                            className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 max-w-[150px] truncate"
-                            title={log.host}
+                            {log.statusCode}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <span
+                            className={
+                              log.responseTime > 1000
+                                ? "text-red-600 font-medium"
+                                : ""
+                            }
                           >
-                            {log.host || "-"}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                            {log.system || "-"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  {/* 페이지네이션 */}
-                  <div className="px-4 py-3 bg-white border-t border-gray-200 sm:px-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-700">
-                        전체 <span className="font-medium">{totalItems}</span>{" "}
-                        항목 중{" "}
-                        <span className="font-medium">
-                          {(filter.page! - 1) * (filter.limit || 10) + 1}
-                        </span>{" "}
-                        -{" "}
-                        <span className="font-medium">
-                          {Math.min(
-                            filter.page! * (filter.limit || 10),
-                            totalItems
+                            {log.responseTime}ms
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{log.ip}</div>
+                          {log.system && (
+                            <div className="text-xs text-gray-500">
+                              {log.system}
+                            </div>
                           )}
-                        </span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={filter.page! <= 1}
-                          onClick={() => goToPage(1)}
-                        >
-                          &#171; 처음
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={filter.page! <= 1}
-                          onClick={() => goToPage(filter.page! - 1)}
-                        >
-                          &lt; 이전
-                        </Button>
-                        <span className="flex items-center px-3 py-1 border rounded">
-                          {filter.page!} / {totalPages}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={filter.page! >= totalPages}
-                          onClick={() => goToPage(filter.page! + 1)}
-                        >
-                          다음 &gt;
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={filter.page! >= totalPages}
-                          onClick={() => goToPage(totalPages)}
-                        >
-                          마지막 &#187;
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* 로그 상세 정보 모달 */}
-      <Modal
-        isOpen={isModalOpen}
-        title="로그 상세 정보"
-        onClose={() => setIsModalOpen(false)}
-      >
-        {selectedLog && (
-          <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "1.5rem",
-              }}
-              className="overflow-hidden"
-            >
-              {/* 왼쪽 컬럼 */}
-              <div className="overflow-hidden">
-                {/* 기본 정보 */}
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3 border-b pb-1">
-                    기본 정보
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-500">
-                        요청 시간
-                      </h4>
-                      <p className="text-sm">
-                        {formatDate(selectedLog.requestTimestamp)}{" "}
-                        {formatTime(selectedLog.requestTimestamp)}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-500">
-                        소요 시간
-                      </h4>
-                      <p className="text-sm">
-                        {selectedLog.responseTime
-                          ? `${selectedLog.responseTime}ms`
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-medium text-gray-500">
-                        상태 코드
-                      </h4>
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs rounded-full ${getStatusColor(
-                            selectedLog.statusCode
-                          )}`}
-                        >
-                          {selectedLog.statusCode || "N/A"}
-                        </span>
-                        <span className="text-sm">
-                          {getStatusText(selectedLog.statusCode)}
-                        </span>
-                      </div>
-                    </div>
-                    {selectedLog.system && (
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500">
-                          시스템
-                        </h4>
-                        <p className="text-sm">{selectedLog.system}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 요청 정보 */}
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3 border-b pb-1">
-                    요청 정보
-                  </h3>
-                  <div>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs rounded-full ${getMethodColor(
-                          selectedLog.method
-                        )}`}
-                      >
-                        {selectedLog.method}
-                      </span>
-                      <span className="text-sm font-medium break-all">
-                        {selectedLog.url}
-                      </span>
-                    </div>
-                    <div className="text-sm mb-2 break-words">
-                      <span className="font-medium">Host:</span>{" "}
-                      {selectedLog.host}
-                    </div>
-                    <div className="text-sm mb-2 break-words">
-                      <span className="font-medium">IP:</span> {selectedLog.ip}
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-medium">User Agent:</span>{" "}
-                      <div className="text-xs mt-1 break-all">
-                        {selectedLog.userAgent}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {/* 오른쪽 컬럼 */}
-              <div className="overflow-hidden">
-                {/* 쿼리 */}
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 border-b pb-1">
-                    Query Parameters
-                  </h3>
-                  <JsonView data={selectedLog.query} />
-                </div>
-
-                {/* 요청 바디 */}
-                <div className="bg-gray-50 p-4 rounded-md mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 border-b pb-1">
-                    Request Body
-                  </h3>
-                  <JsonView data={selectedLog.body} />
-                </div>
-
-                {/* 응답 또는 오류 */}
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 border-b pb-1">
-                    {selectedLog.error ? "Error" : "Response"}
-                  </h3>
-                  <JsonView
-                    data={
-                      selectedLog.error && typeof selectedLog.error !== "string"
-                        ? (selectedLog.error as Record<string, unknown>)
-                        : selectedLog.response
-                    }
-                  />
-                </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                조건에 맞는 로그가 없습니다.
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              {(page - 1) * limit + 1}-{Math.min(page * limit, total)} / {total}
+              개 표시
             </div>
 
-            {/* 닫기 버튼 */}
-            <div className="flex justify-end mt-6">
-              <Button onClick={() => setIsModalOpen(false)}>닫기</Button>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                이전
+              </Button>
+
+              <span className="px-3 py-1 text-sm text-gray-700">
+                {page} / {totalPages}
+              </span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                다음
+              </Button>
             </div>
-          </>
+          </div>
         )}
-      </Modal>
+      </div>
     </AdminLayout>
   );
 }
