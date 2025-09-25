@@ -17,9 +17,7 @@ export abstract class BaseModule {
   }
 
   protected getBaseUrl(): string {
-    return process.env.NODE_ENV === "development"
-      ? "http://localhost:3030"
-      : "https://lsso.vercel.app";
+    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3030";
   }
 
   protected getAuthHeaders(): HeadersInit {
