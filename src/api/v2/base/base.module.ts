@@ -17,7 +17,8 @@ export abstract class BaseModule {
   }
 
   protected getBaseUrl(): string {
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3030";
+    // Next.js API Routes를 프록시로 사용 (CORS 문제 해결)
+    return "";
   }
 
   protected getAuthHeaders(): HeadersInit {
@@ -37,7 +38,8 @@ export abstract class BaseModule {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.getBaseUrl()}/api${endpoint}`;
+    // Next.js API Routes를 통한 프록시 요청
+    const url = `/api${endpoint}`;
 
     const config: RequestInit = {
       ...options,
