@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["lsso-admin.vercel.app", "lsso-dev.vercel.app"],
+    },
+  },
 
   async headers() {
     return [
@@ -26,7 +31,7 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Access-Control-Allow-Origin",
-            value: "https://lsso-dev.vercel.app",
+            value: "*",
           },
           {
             key: "Access-Control-Allow-Methods",
