@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_URL ||
-  "https://lsso-git-dev-lumir-tech7s-projects.vercel.app";
+import { fetchBackend, API_CONFIG, createErrorResponse } from "../../config";
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,24 +8,19 @@ export async function POST(request: NextRequest) {
     console.log("🔐 로그인 프록시 요청:", {
       grant_type: body.grant_type,
       email: body.email,
-      password: body.password,
+      password: body.password ? "***" : "없음",
     });
 
-    const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    const response = await fetchBackend("/api/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(body),
     });
 
-    console.log("📡 백엔드 응답 상태:", response, response.status);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { message: errorData.message || "로그인 실패" },
-        { status: response.status }
+      return createErrorResponse(
+        errorData.message || "로그인 실패",
+        response.status
       );
     }
 
@@ -38,9 +30,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("❌ 로그인 프록시 에러:", error);
-    return NextResponse.json(
-      { message: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return createErrorResponse(API_CONFIG.ERROR_MESSAGES.SERVER_ERROR, 500);
   }
 }

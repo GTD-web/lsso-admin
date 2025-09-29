@@ -1,46 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BACKEND_URL =
-  process.env.BACKEND_URL ||
-  "https://lsso-git-dev-lumir-tech7s-projects.vercel.app";
+import {
+  fetchBackend,
+  API_CONFIG,
+  getAuthorizationHeader,
+  createErrorResponse,
+} from "../../../../config";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authorization = request.headers.get("authorization");
+    const authorization = getAuthorizationHeader(request);
     const body = await request.json();
     const { id } = await params;
 
     if (!authorization) {
-      return NextResponse.json(
-        { message: "인증 토큰이 없습니다." },
-        { status: 401 }
-      );
+      return createErrorResponse(API_CONFIG.ERROR_MESSAGES.UNAUTHORIZED, 401);
     }
 
     console.log("🏢 부서 수정 프록시 요청:", { id, body });
 
-    const response = await fetch(
-      `${BACKEND_URL}/api/admin/organizations/departments/${id}`,
+    const response = await fetchBackend(
+      `/api/admin/organizations/departments/${id}`,
       {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
           Authorization: authorization,
         },
         body: JSON.stringify(body),
       }
     );
 
-    console.log("📡 부서 수정 응답 상태:", response.status);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { message: errorData.message || "부서 수정 실패" },
-        { status: response.status }
+      return createErrorResponse(
+        errorData.message || "부서 수정 실패",
+        response.status
       );
     }
 
@@ -50,10 +46,7 @@ export async function PUT(
     return NextResponse.json(data);
   } catch (error) {
     console.error("❌ 부서 수정 프록시 에러:", error);
-    return NextResponse.json(
-      { message: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return createErrorResponse(API_CONFIG.ERROR_MESSAGES.SERVER_ERROR, 500);
   }
 }
 
@@ -62,36 +55,30 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const authorization = request.headers.get("authorization");
+    const authorization = getAuthorizationHeader(request);
     const { id } = await params;
 
     if (!authorization) {
-      return NextResponse.json(
-        { message: "인증 토큰이 없습니다." },
-        { status: 401 }
-      );
+      return createErrorResponse(API_CONFIG.ERROR_MESSAGES.UNAUTHORIZED, 401);
     }
 
     console.log("🏢 부서 삭제 프록시 요청:", { id });
 
-    const response = await fetch(
-      `${BACKEND_URL}/api/admin/organizations/departments/${id}`,
+    const response = await fetchBackend(
+      `/api/admin/organizations/departments/${id}`,
       {
         method: "DELETE",
         headers: {
-          "Content-Type": "application/json",
           Authorization: authorization,
         },
       }
     );
 
-    console.log("📡 부서 삭제 응답 상태:", response.status);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { message: errorData.message || "부서 삭제 실패" },
-        { status: response.status }
+      return createErrorResponse(
+        errorData.message || "부서 삭제 실패",
+        response.status
       );
     }
 
@@ -106,9 +93,6 @@ export async function DELETE(
     return NextResponse.json(data);
   } catch (error) {
     console.error("❌ 부서 삭제 프록시 에러:", error);
-    return NextResponse.json(
-      { message: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return createErrorResponse(API_CONFIG.ERROR_MESSAGES.SERVER_ERROR, 500);
   }
 }

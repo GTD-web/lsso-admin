@@ -33,7 +33,7 @@ export class LogsRepository extends BaseModule implements ILogsRepository {
   }
 
   async filterLogs(filterDto: LogFilterDto): Promise<LogsResponse> {
-    return this.makeRequest<LogsResponse>("/api/admin/logs/filter", {
+    return this.makeRequest<LogsResponse>("/admin/logs/filter", {
       method: "POST",
       body: JSON.stringify(filterDto),
     });

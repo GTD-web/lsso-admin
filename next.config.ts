@@ -9,7 +9,11 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ["lsso-admin.vercel.app", "lsso-dev.vercel.app"],
+      allowedOrigins: [
+        "lsso-admin.vercel.app",
+        "lsso-dev.vercel.app",
+        "lsso-git-dev-lumir-tech7s-projects.vercel.app",
+      ],
     },
   },
 
