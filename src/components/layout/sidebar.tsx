@@ -12,6 +12,7 @@ import {
   UserGroupIcon,
   DocumentTextIcon,
   HomeIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 
 const navigation = [
@@ -24,6 +25,11 @@ const navigation = [
     name: "조직 관리",
     href: "/organizations",
     icon: BuildingOfficeIcon,
+  },
+  {
+    name: "직원 관리",
+    href: "/employees",
+    icon: UsersIcon,
   },
   {
     name: "시스템 관리",
